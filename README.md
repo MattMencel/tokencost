@@ -4,6 +4,8 @@
 
 A local proxy that sits between your tools and the LLM APIs. It tracks every token, calculates real costs, and optimizes requests on the fly. Works with Claude Code, VS Code, Claude Desktop, OpenAI, Groq, and 12+ other providers.
 
+<img width="1592" height="480" alt="image" src="https://github.com/user-attachments/assets/8931958f-c0a2-4b21-b3fe-85c857d10704" />
+
 
 ---
 
@@ -22,7 +24,6 @@ If you use Claude Code or VS Code AI tools heavily, you're probably spending $2�
 ### 📊 Live Dashboard
 Full spend analytics at `http://localhost:8082/dashboard`:
 
-
 - **Cost by day / week / month** — trend chart with daily breakdown
 - **By task type** — Coding vs Shell vs Agent vs Planning vs Web
 - **By model** — Claude Haiku / Sonnet / Opus / GPT-4o / etc.
@@ -31,6 +32,8 @@ Full spend analytics at `http://localhost:8082/dashboard`:
 - **Session view** — every conversation: tokens in/out, cost, tools used
 - **RAW Logs** — last 500 requests with full prompt preview
 - **Health grade A–F** — scores your efficiency and tells you what to fix
+<img width="1587" height="499" alt="image" src="https://github.com/user-attachments/assets/685ad792-f452-4ade-bcf5-555b44950a1e" />
+
 
 ### 🍎 macOS Menu Bar Widget
 Always-visible cost tracker in your menu bar. Click to see:
@@ -39,6 +42,7 @@ Always-visible cost tracker in your menu bar. Click to see:
 - Breakdown by task, model, cache, tools
 - Smart Routing optimizer stats
 - One-click sync from local logs
+<img width="380" height="643" alt="image" src="https://github.com/user-attachments/assets/3bec60fb-73c6-456c-8851-1a00faf69af6" />
 
 ### ⚡ Automatic Optimizations
 The proxy applies these silently on every request:
@@ -54,8 +58,7 @@ The proxy applies these silently on every request:
 
 Smart Routing scores each prompt 0–10 (length, keywords, code presence) and silently downgrades model when complexity is low. You get the same response, cheaper.
 
-
-
+<img width="1590" height="695" alt="image" src="https://github.com/user-attachments/assets/f5b7e447-41da-4aed-890c-bc047a8ddbc9" />
 
 ---
 
