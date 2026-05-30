@@ -64,7 +64,9 @@ Smart Routing scores each prompt 0–10 (length, keywords, code presence) and si
 
 ## Install
 
-**Requirements:** macOS (Monterey 12+), Python 3.9+
+> ⚠️ **macOS only** — This tool requires macOS (Monterey 12+) and the launchd system. Linux and Windows are not currently supported.
+
+**Requirements:** Python 3.9+
 
 **Step 1 — first time only:**
 ```bash
