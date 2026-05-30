@@ -1,0 +1,2554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TokenCost</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #f0f2f7;
+  --surface: #ffffff;
+  --border:  #dde1ea;
+  --accent:  #16a34a;
+  --accent2: #2563eb;
+  --warn:    #ea580c;
+  --good:    #16a34a;
+  --text:    #111827;
+  --muted:   #6b7280;
+  --mono:    'IBM Plex Mono', monospace;
+  --sans:    'IBM Plex Sans', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;font-size:14px}
+
+/* ── Header ── */
+header{padding:14px 32px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;position:sticky;top:0;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06);z-index:100;width:100%}
+.logo{font-family:var(--mono);font-size:12px;color:#111827;letter-spacing:2px;text-transform:uppercase;white-space:nowrap;font-weight:600}
+.logo span{color:var(--muted)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#16a34a;animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(22,163,74,.4)}50%{opacity:.7;box-shadow:0 0 0 5px rgba(22,163,74,0)}}
+.live-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:1px}
+.period-bar{display:flex;gap:4px;margin-left:auto}
+.period-btn{font-family:var(--mono);font-size:11px;background:#fff;border:1px solid var(--border);color:var(--muted);padding:5px 14px;border-radius:6px;cursor:pointer;letter-spacing:.5px;transition:all .15s;font-weight:500}
+.period-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+.period-btn.active{background:var(--accent2);border-color:var(--accent2);color:#fff}
+
+/* ── Nav ── */
+.nav-bar{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 32px;background:#fff}
+.nav-link{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;text-decoration:none;padding:10px 16px;border-bottom:2px solid transparent;transition:all .15s;font-weight:500}
+.nav-link:hover{color:var(--text);border-color:var(--border)}
+
+/* ── Layout ── */
+main{padding:20px 28px;width:100%;box-sizing:border-box}
+/* scroll anchors clear the sticky header */
+.sec-anchor{scroll-margin-top:90px}
+/* section divider label */
+.sec-label{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:16px 0 8px;border-bottom:2px solid var(--border);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.sec-label::before{content:'§';opacity:.35;font-size:13px}
+.section{margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.card-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);font-weight:600}
+.section-sep{display:none}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;align-items:start}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;align-items:start}
+.grid-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:14px;align-items:start}
+
+/* ── Hero KPIs ── */
+.hero-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.hero-kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px;position:relative;overflow:hidden;cursor:default;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.hero-kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px}
+.hk-cost::after{background:linear-gradient(90deg,var(--accent),transparent)}
+.hk-proj::after{background:linear-gradient(90deg,var(--accent2),transparent)}
+.hk-cache::after{background:linear-gradient(90deg,var(--good),transparent)}
+.hk-reqs::after{background:linear-gradient(90deg,#9ca3af,transparent)}
+.hk-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;font-weight:600}
+.hk-val{font-family:var(--mono);font-size:32px;font-weight:700;line-height:1;margin-bottom:6px}
+.hk-cost .hk-val{color:var(--accent)}
+.hk-proj .hk-val{color:var(--accent2)}
+.hk-cache .hk-val{color:var(--good)}
+.hk-reqs .hk-val{color:var(--text)}
+.hk-sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+/* ── Health Grade ── */
+.hg-circle{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:60px;height:60px;border-radius:50%;border:3px solid currentColor;font-family:var(--mono);flex-shrink:0}
+.hg-letter{font-size:28px;font-weight:800;line-height:1}
+.hg-score{font-size:9px;font-weight:600;letter-spacing:.5px;opacity:.75}
+.hg-details{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.65;flex:1}
+.hg-details li{list-style:none;padding-left:12px;position:relative}
+.hg-details li::before{content:'·';position:absolute;left:0}
+
+/* ── Task Breakdown ── */
+.task-bar{height:8px;border-radius:4px;display:inline-block;vertical-align:middle}
+
+/* ── Action Plan ── */
+.ap-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden}
+.ap-header{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:24px;padding:18px 24px;border-bottom:1px solid var(--border);background:#fafbff}
+.ap-header-title{font-family:var(--mono);font-size:12px;color:var(--text);letter-spacing:1px;text-transform:uppercase;white-space:nowrap;font-weight:700}
+.ap-numbers{display:flex;align-items:center;gap:12px}
+.ap-num{text-align:center;min-width:100px}
+.ap-num-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;font-weight:500}
+.ap-num-val{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1}
+.ap-num-neutral{color:var(--text)}
+.ap-num-warn{color:var(--warn)}
+.ap-num-good{color:var(--good)}
+.ap-arrow{font-size:18px;color:#d1d5db;margin:0 2px}
+.ap-save-pill{font-family:var(--mono);font-size:13px;font-weight:700;color:#fff;background:var(--good);border-radius:6px;padding:7px 14px;white-space:nowrap}
+/* table */
+.ap-table{width:100%}
+.ap-thead{display:grid;grid-template-columns:1fr 100px 120px 240px;gap:0;padding:8px 24px;border-bottom:1px solid var(--border);background:#f9fafb}
+.ap-th{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-weight:600}
+.ap-row{display:grid;grid-template-columns:1fr 100px 120px 240px;gap:0;padding:14px 24px;border-bottom:1px solid #f3f4f6;align-items:start;transition:background .1s}
+.ap-row:hover{background:#f9fafb}
+.ap-row-ttl-warn{background:#fffbf5;border-left:3px solid #f97316;padding-left:21px}
+.ap-row-ttl-warn:hover{background:#fff7ed}
+.ap-row-ttl-ok{background:#f8fffe;border-left:3px solid #22c55e;padding-left:21px}
+.ap-row-ttl-ok:hover{background:#f0fdf4}
+.ap-action-title{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.ap-action-desc{font-size:12px;color:var(--muted);line-height:1.6}
+.ap-badge{font-family:var(--mono);font-size:9px;letter-spacing:.5px;border-radius:4px;padding:2px 6px;flex-shrink:0;font-weight:600}
+.ap-badge-exact{background:#dcfce7;color:#15803d;border:1px solid #bbf7d0}
+.ap-badge-estimate{background:#fef9c3;color:#a16207;border:1px solid #fde68a}
+.ap-badge-rough{background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb}
+.ap-cell-saving{padding-top:2px}
+.ap-saving-val{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--good);line-height:1}
+.ap-saving-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px}
+.ap-cmd-wrap{font-family:var(--mono);font-size:10px;color:#374151;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;white-space:pre;overflow-x:auto;cursor:text;user-select:all;line-height:1.6;max-width:235px}
+.ap-total-row{display:grid;grid-template-columns:1fr 100px 120px 240px;gap:0;padding:14px 24px;background:#f0fdf4;border-top:1px solid #bbf7d0}
+.ap-total-label{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--good);letter-spacing:.5px}
+.ap-total-val{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--good)}
+
+/* ── Insights ── */
+.insights-section{margin-bottom:20px}
+.insights-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.insights-header-title{font-family:var(--mono);font-size:12px;color:var(--text);letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.insights-total{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--good)}
+.ins-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid;border-radius:8px;padding:16px 20px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.ins-card-warn{border-left-color:var(--warn)}
+.ins-card-good{border-left-color:var(--good)}
+.ins-card-info{border-left-color:var(--accent2)}
+.ins-card-tip {border-left-color:#7c3aed}
+.ins-card-body{padding:0}
+.ins-card-title{font-family:var(--mono);font-size:13px;font-weight:600;margin-bottom:6px}
+.ins-card-warn .ins-card-title{color:var(--warn)}
+.ins-card-good .ins-card-title{color:var(--good)}
+.ins-card-info .ins-card-title{color:var(--accent2)}
+.ins-card-tip  .ins-card-title{color:#7c3aed}
+.ins-problem{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:10px}
+.ins-action{background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--text);line-height:1.5}
+.ins-action-label{font-family:var(--mono);font-size:10px;color:var(--accent2);letter-spacing:1px;margin-bottom:4px;text-transform:uppercase;font-weight:600}
+.ins-savings-box{text-align:right;flex-shrink:0;min-width:90px}
+.ins-savings-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.ins-savings-val{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--good);line-height:1}
+.ins-savings-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ── Trend chart ── */
+.trend-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 24px 16px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.trend-chart-area{position:relative;display:flex;gap:0}
+.trend-y-axis{width:38px;flex-shrink:0;position:relative;height:120px;padding-top:24px}
+.trend-y-axis span{font-family:var(--mono);font-size:9px;color:var(--muted);display:block}
+.trend-chart-inner{flex:1;min-width:0;position:relative}
+.trend-gridlines{position:absolute;inset:24px 0 0 0;pointer-events:none}
+.trend-gridline{position:absolute;left:0;right:0;height:1px;background:#f0f0f0}
+.trend-bars{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:24px}
+.trend-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:crosshair;position:relative}
+.trend-bar-col:hover .trend-bar-fill{filter:brightness(1.15)}
+.trend-bar-fill{width:100%;background:linear-gradient(to top,#2563eb,#93c5fd);border-radius:3px 3px 0 0;min-height:2px;transition:filter .1s}
+.trend-bar-label{position:absolute;top:0;left:0;right:0;text-align:center;font-family:var(--mono);font-size:10px;color:#1d4ed8;white-space:nowrap;overflow:hidden;line-height:1;padding:1px 1px 0;font-weight:600}
+.trend-axis{display:flex;gap:4px;margin-top:6px}
+.trend-lbl{flex:1;text-align:center;font-family:var(--mono);font-size:10px;color:var(--muted);overflow:hidden;white-space:nowrap}
+.trend-axis-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:.5px;padding-left:38px}
+
+/* ── Cost breakdown ── */
+.breakdown-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.bd-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.bd-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;font-weight:600}
+.bd-value{font-family:var(--mono);font-size:20px;font-weight:700}
+.bd-pct{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px}
+.bd-bar{height:3px;background:#e5e7eb;border-radius:2px;margin-top:10px;overflow:hidden}
+.bd-bar-fill{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+/* ── Bar rows ── */
+.bar-row{margin-bottom:12px}
+.bar-meta{display:flex;justify-content:space-between;margin-bottom:5px;align-items:baseline;gap:8px}
+.bar-name{font-family:var(--mono);font-size:13px;color:var(--text);white-space:nowrap}
+.bar-vals{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
+.bar-vals .hi{color:var(--warn)}
+.bar-track{height:4px;background:#e5e7eb;border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),#60a5fa);border-radius:3px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+
+/* ── Cache strip ── */
+.cache-strip{background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid var(--good);border-radius:8px;padding:16px 24px;margin-bottom:20px;display:flex;align-items:center;gap:32px;flex-wrap:wrap}
+.cs-big{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--good)}
+.cs-label{font-family:var(--mono);font-size:10px;color:#15803d;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;font-weight:600}
+.cs-rate{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--accent2)}
+.cs-bar-wrap{flex:1;min-width:160px}
+.cs-bar-track{height:6px;background:#d1fae5;border-radius:3px;overflow:hidden;margin-top:6px}
+.cs-bar-fill{height:100%;background:linear-gradient(90deg,var(--good),var(--accent2));border-radius:3px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+/* ── Haiku card ── */
+.haiku-card{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent2);border-radius:8px;padding:20px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.haiku-row{display:flex;gap:28px;align-items:center;flex-wrap:wrap}
+.haiku-num{font-family:var(--mono);font-size:22px;font-weight:700}
+.haiku-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;font-weight:600}
+.haiku-note{font-family:var(--sans);font-size:13px;color:var(--muted);line-height:1.6;flex:1;min-width:200px}
+
+/* ── Heatmaps ── */
+.hm-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.05);overflow-x:auto}
+.hm-inner{display:flex;gap:6px;align-items:flex-start}
+.hm-day-labels{display:flex;flex-direction:column;gap:3px;padding-top:16px;margin-right:4px;flex-shrink:0}
+.hm-day-labels span{font-family:var(--mono);font-size:10px;color:var(--muted);height:36px;line-height:36px;width:24px;text-align:right}
+.hm-right{flex:1;min-width:0}
+.hm-months{display:grid;gap:3px;margin-bottom:3px}
+.hm-months span{font-family:var(--mono);font-size:10px;color:var(--muted);height:13px;line-height:13px;overflow:hidden;text-align:center}
+.hm-grid{display:grid;gap:3px}
+.hm-cell{border-radius:3px;cursor:default;display:flex;align-items:center;justify-content:center;overflow:hidden;height:36px}
+.hm-cell:hover{opacity:.8}
+.hm-cell-lbl{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.9);line-height:1;pointer-events:none;user-select:none;font-weight:600}
+.hm-legend{display:flex;align-items:center;gap:4px;margin-top:8px;justify-content:flex-end}
+.hm-legend span{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.hm-legend-cell{width:12px;height:12px;border-radius:2px}
+
+/* Hourly heatmap */
+.hourly-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.05);overflow-x:auto}
+.hourly-inner{display:flex;gap:6px;align-items:flex-start}
+.hourly-day-labels{display:flex;flex-direction:column;gap:3px;padding-top:22px;margin-right:4px;flex-shrink:0}
+.hourly-day-labels span{height:38px;width:56px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:1px}
+.hourly-day-labels .dow-name{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1}
+.hourly-day-labels .dow-date{font-family:var(--mono);font-size:9px;color:#94a3b8;line-height:1}
+.hourly-grid-wrap{flex:1;min-width:0}
+.hourly-hour-labels{display:grid;gap:3px;margin-bottom:3px;grid-template-columns:repeat(var(--hm-cols,24),1fr)}
+.hourly-hour-lbl{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;height:15px;line-height:15px}
+.hourly-grid{display:grid;grid-template-columns:repeat(var(--hm-cols,24),1fr);grid-template-rows:repeat(7,38px);gap:3px}
+.hourly-cell{border-radius:3px;cursor:default;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;overflow:hidden}
+.hourly-cell:hover{opacity:.8}
+.hourly-cell-cost{font-family:var(--mono);font-size:9px;font-weight:700;color:rgba(255,255,255,.95);line-height:1;user-select:none}
+.hourly-cell-reqs{font-family:var(--mono);font-size:8px;color:rgba(255,255,255,.65);line-height:1;user-select:none}
+/* Totals column */
+.hourly-totals{display:flex;flex-direction:column;gap:3px;margin-left:4px;padding-top:0;flex-shrink:0}
+.hourly-totals-header{font-family:var(--mono);font-size:10px;color:var(--muted);height:15px;line-height:15px;text-align:center;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px;font-weight:600}
+.hourly-total-cell{height:38px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:56px}
+.hourly-total-cost{font-family:var(--mono);font-size:10px;font-weight:700;color:#1d4ed8;line-height:1}
+.hourly-total-reqs{font-family:var(--mono);font-size:9px;color:#6b7280;line-height:1}
+
+/* ── Effort badges ── */
+.ef{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.3px;padding:3px 8px;border-radius:4px;white-space:nowrap}
+.ef-standard{background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb}
+.ef-low     {background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd}
+.ef-medium  {background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.ef-high    {background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.ef-xhigh   {background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+
+/* ── Tables ── */
+.table-wrap{overflow-x:auto;width:100%}
+table{min-width:max-content;width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+th{text-align:left;padding:9px 12px;color:#374151;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-size:11px;border-bottom:2px solid #c7d2e0;white-space:nowrap;background:#eef2f8}
+td{padding:9px 12px;border-bottom:1px solid #edf0f5;vertical-align:middle}
+tr:nth-child(even) td{background:#f7f9fc}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#eef4ff!important}
+tr.tfoot-total td{border-top:2px solid #c7d2e0;background:#e8f0fe;font-weight:700;color:#1e3a5f;border-bottom:none}
+tr.tfoot-total:hover td{background:#dce8fb!important}
+.tag{display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;letter-spacing:.3px;white-space:nowrap;font-weight:500}
+.tag-vscode  {background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.tag-cli     {background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+.tag-cursor  {background:#faf5ff;color:#6d28d9;border:1px solid #ddd6fe}
+.tag-litellm {background:#fdf4ff;color:#7c3aed;border:1px solid #e9d5ff}
+.tag-other   {background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.stop-end  {color:var(--good);font-size:11px;font-weight:600}
+.stop-tool {color:var(--accent2);font-size:11px;font-weight:600}
+.stop-max  {color:var(--warn);font-size:11px;font-weight:600}
+.c-hi{color:var(--warn)}
+.c-ok{color:var(--good)}
+.c-good{color:var(--good)}
+.c-muted{color:var(--muted)}
+.empty{text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:13px}
+.hit-bar{display:inline-block;height:6px;background:#e5e7eb;border-radius:3px;width:60px;vertical-align:middle;position:relative;overflow:hidden}
+.hit-bar-fill{position:absolute;left:0;top:0;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--good),var(--accent2));transition:width .5s}
+
+/* ── Pager ── */
+.pager{display:flex;align-items:center;gap:8px;margin-top:14px;justify-content:flex-end}
+.pager-btn{font-family:var(--mono);font-size:11px;background:#fff;border:1px solid var(--border);color:var(--muted);padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s}
+.pager-btn:hover:not(:disabled){border-color:var(--accent2);color:var(--accent2)}
+.pager-btn:disabled{opacity:.3;cursor:default}
+.pager-info{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.refresh-note{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;padding:8px 0;letter-spacing:.5px}
+
+#hm-tooltip{position:fixed;display:none;background:#111827;border:1px solid #374151;color:#f9fafb;font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:6px;pointer-events:none;z-index:10000;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+
+/* ── Nav active tab ── */
+.nav-link.nav-active{color:var(--text);border-bottom-color:var(--accent2)}
+
+/* ── RAW Logs view ── */
+#raw-logs-view{padding:20px 28px;display:none}
+.rl-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.rl-search{font-family:var(--mono);font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 12px;outline:none;flex:1;min-width:200px;max-width:380px;background:#fff;color:var(--text)}
+.rl-search:focus{border-color:var(--accent2)}
+.rl-filter-btn{font-family:var(--mono);font-size:11px;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.rl-filter-btn:hover{border-color:var(--accent2);color:var(--accent2)}
+.rl-filter-btn.active{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.rl-refresh-toggle{transition:all .15s}
+.rl-refresh-toggle.active{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.rl-refresh-toggle.inactive{background:#fecaca;border-color:#fca5a5;color:#7f1d1d}
+.rl-count{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:auto}
+
+/* prompt preview cell */
+.prompt-cell{max-width:420px;cursor:pointer}
+.prompt-short{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;transition:color .1s}
+.prompt-cell:hover .prompt-short{color:var(--text)}
+.prompt-full{display:none;font-family:var(--mono);font-size:11px;color:var(--text);white-space:pre-wrap;word-break:break-word;background:#f8fafc;border:1px solid var(--border);border-radius:4px;padding:8px 10px;margin-top:4px;max-height:220px;overflow-y:auto;line-height:1.55}
+.prompt-cell.expanded .prompt-full{display:block}
+.prompt-cell.expanded .prompt-short{white-space:normal;overflow:visible;text-overflow:unset;color:var(--text);font-weight:500}
+
+/* model tier colors in raw log */
+.m-haiku {color:#16a34a;font-weight:600}
+.m-sonnet{color:#2563eb;font-weight:600}
+.m-opus  {color:#ea580c;font-weight:600}
+.m-other {color:var(--muted)}
+
+/* raw logs: effort badge */
+.effort-std  {font-size:10px;color:#9ca3af;font-family:var(--mono)}
+.effort-low  {font-size:10px;background:#e0f2fe;color:#0369a1;border-radius:3px;padding:1px 5px;white-space:nowrap}
+.effort-med  {font-size:10px;background:#fef3c7;color:#b45309;border-radius:3px;padding:1px 5px;white-space:nowrap}
+.effort-high {font-size:10px;background:#fee2e2;color:#b91c1c;border-radius:3px;padding:1px 5px;white-space:nowrap}
+.effort-xhigh{font-size:10px;background:#f5d0fe;color:#7e22ce;border-radius:3px;padding:1px 5px;white-space:nowrap;font-weight:700}
+.effort-auto {font-size:10px;background:#dcfce7;color:#15803d;border-radius:3px;padding:1px 5px;white-space:nowrap;margin-left:3px}
+
+/* row highlight when navigated via URL */
+tr.rl-highlight td{background:#fef9c3!important}
+</style>
+</head>
+<body>
+<div id="hm-tooltip"></div>
+
+<!-- ── Header ── -->
+<div id="update-banner" style="display:none;align-items:center;gap:12px;padding:10px 32px;background:var(--warn);color:#fff;font-family:var(--mono);font-size:12px;position:sticky;top:0;z-index:200">
+  <span>⬆ Update available: <span id="banner-versions"></span></span>
+  <button onclick="showUpdateModal()" style="margin-left:auto;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;font-family:var(--mono);font-size:11px;font-weight:700;padding:4px 12px;border-radius:5px;cursor:pointer">How to update →</button>
+</div>
+
+<div id="update-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">Update TokenCost</div>
+    <div style="font-family:var(--sans);font-size:13px;color:var(--muted);margin-bottom:18px">Run this command in Terminal to update:</div>
+    <div style="background:#f4f5f7;border-radius:8px;padding:14px 16px;font-family:var(--mono);font-size:12px;color:var(--text);word-break:break-all;position:relative" id="update-cmd-box"></div>
+    <button onclick="copyUpdateCmd()" style="margin-top:12px;background:var(--warn);color:#fff;border:none;font-family:var(--mono);font-size:12px;font-weight:700;padding:8px 20px;border-radius:6px;cursor:pointer" id="copy-btn">Copy command</button>
+    <button onclick="document.getElementById('update-modal').style.display='none'" style="margin-top:12px;margin-left:8px;background:none;border:1px solid var(--border);font-family:var(--mono);font-size:12px;padding:8px 20px;border-radius:6px;cursor:pointer;color:var(--muted)">Close</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">TokenCost</div>
+  <div class="live-dot"></div>
+  <div class="live-label">LIVE</div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+    <span id="version-badge" style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.5px;white-space:nowrap">v—</span>
+    <button id="check-version-btn" onclick="checkVersion()" style="display:flex;align-items:center;gap:5px;background:#f4f5f7;border:1px solid var(--border);cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);padding:4px 10px;border-radius:6px;transition:all 0.15s;white-space:nowrap" onmouseover="this.style.background='#e9eaed';this.style.color='var(--text)'" onmouseout="this.style.background='#f4f5f7';this.style.color='var(--muted)'">
+      <span style="font-size:13px">↻</span> Check version
+    </button>
+  </div>
+  <div class="period-bar">
+    <button class="period-btn active" data-period="today" onclick="setPeriod('today')">Today</button>
+    <button class="period-btn" data-period="7d"  onclick="setPeriod('7d')">7d</button>
+    <button class="period-btn" data-period="30d"        onclick="setPeriod('30d')">30d</button>
+    <button class="period-btn" data-period="all"        onclick="setPeriod('all')">All</button>
+  </div>
+</header>
+
+<div class="nav-bar">
+  <a class="nav-link" href="#overview"  onclick="showMain()">Overview</a>
+  <a class="nav-link" href="#breakdown" onclick="showMain()">Breakdown</a>
+  <a class="nav-link" href="#projects"  onclick="showMain()">Projects</a>
+  <a class="nav-link" href="#analysis"  onclick="showMain()">Analysis</a>
+  <a class="nav-link" href="#activity"  onclick="showMain()">Activity</a>
+  <a class="nav-link" href="#sessions"  onclick="showMain()">Sessions</a>
+  <a class="nav-link" href="#requests"  onclick="showMain()">Requests</a>
+  <a class="nav-link" id="nav-optimizer" href="#optimizer" onclick="showOptimizer();history.replaceState(null,'','#optimizer');return false">Optimizer</a>
+  <a class="nav-link" id="nav-raw" href="#raw" onclick="showRaw();history.replaceState(null,'','#raw');return false">RAW Logs</a>
+</div>
+
+<main>
+
+<!-- ══ FIRST SCREEN ══════════════════════════════════════════════ -->
+<div id="overview" class="sec-anchor">
+<div class="sec-label">Overview — today's costs &amp; optimizations</div>
+
+  <!-- Hero KPIs -->
+  <div class="hero-row">
+    <div class="hero-kpi hk-cost">
+      <div class="hk-label">Total Cost</div>
+      <div class="hk-val" id="hk-cost">—</div>
+      <div class="hk-sub" id="hk-cost-sub">this period</div>
+    </div>
+    <div class="hero-kpi hk-proj">
+      <div class="hk-label">Monthly Projection</div>
+      <div class="hk-val" id="hk-proj">—</div>
+      <div class="hk-sub" id="hk-proj-sub">at current 7-day rate</div>
+    </div>
+    <div class="hero-kpi hk-cache">
+      <div class="hk-label">Cache Hit Rate</div>
+      <div class="hk-val" id="hk-cache">—</div>
+      <div class="hk-sub" id="hk-cache-sub">— saved vs no cache</div>
+    </div>
+    <div class="hero-kpi hk-reqs">
+      <div class="hk-label">Requests</div>
+      <div class="hk-val" id="hk-reqs">—</div>
+      <div class="hk-sub" id="hk-reqs-sub">— avg per request</div>
+    </div>
+  </div>
+
+  <!-- Action Plan — dynamic savings calculator -->
+  <div class="ap-wrap" id="ap-wrap" style="display:none">
+    <div class="ap-header">
+      <div id="ap-grade-circle" class="hg-circle" style="color:#9ca3af;display:none">
+        <span class="hg-letter" id="ap-grade-letter">—</span>
+        <span class="hg-score" id="ap-grade-score"></span>
+      </div>
+      <div>
+        <div class="ap-header-title">How to Reduce Costs</div>
+        <div id="ap-grade-hint" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px;max-width:280px;line-height:1.5"></div>
+      </div>
+      <div class="ap-numbers">
+        <div class="ap-num">
+          <div class="ap-num-label">Today</div>
+          <div class="ap-num-val ap-num-neutral" id="ap-today">—</div>
+        </div>
+        <div class="ap-arrow">→</div>
+        <div class="ap-num">
+          <div class="ap-num-label">Month projection</div>
+          <div class="ap-num-val ap-num-warn" id="ap-proj">—</div>
+        </div>
+        <div class="ap-arrow">→</div>
+        <div class="ap-num">
+          <div class="ap-num-label">After tips</div>
+          <div class="ap-num-val ap-num-good" id="ap-optimized">—</div>
+        </div>
+      </div>
+      <div class="ap-save-pill" id="ap-save-pill">save —</div>
+    </div>
+    <div class="ap-table">
+      <div class="ap-thead">
+        <div class="ap-th">Action</div>
+        <div class="ap-th">Save / day</div>
+        <div class="ap-th">Save / month</div>
+        <div class="ap-th">Command</div>
+      </div>
+      <div id="ap-rows"></div>
+      <div class="ap-total-row" id="ap-total-row" style="display:none">
+        <div class="ap-total-label">Total potential savings</div>
+        <div class="ap-total-val" id="ap-total-day">—</div>
+        <div class="ap-total-val" id="ap-total-month">—</div>
+        <div></div>
+      </div>
+    </div>
+
+    <!-- Model × Effort reference guide -->
+    <div style="border-top:1px solid var(--border);padding:14px 20px 16px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">
+        Model &amp; Effort — what to use and when
+      </div>
+      <div class="table-wrap">
+        <table style="font-size:11px">
+          <thead><tr>
+            <th>Model</th><th>Effort</th><th>Thinking budget</th>
+            <th>Cost (input/output)</th><th>Best for</th><th>Example tasks</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td style="color:var(--text);font-weight:600">Haiku 4.5</td>
+              <td><span class="ef ef-standard">—</span></td>
+              <td style="color:var(--muted)">none</td>
+              <td style="color:var(--good);font-family:var(--mono)">$1 / $5</td>
+              <td>Ultra-fast simple tasks</td>
+              <td style="color:var(--muted)">Grep, file lookup, "what is X?", yes/no questions, linting</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text);font-weight:600">Sonnet 4.6</td>
+              <td><span class="ef ef-standard">standard</span></td>
+              <td style="color:var(--muted)">none</td>
+              <td style="color:var(--accent2);font-family:var(--mono)">$3 / $15</td>
+              <td>Everyday coding</td>
+              <td style="color:var(--muted)">Bug fixes, refactoring, writing functions, code review, tests</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text);font-weight:600">Sonnet 4.6</td>
+              <td><span class="ef ef-medium">medium</span></td>
+              <td style="color:var(--muted)">~4k tokens</td>
+              <td style="color:var(--accent2);font-family:var(--mono)">$3 / $15 + think</td>
+              <td>Tricky bugs &amp; design</td>
+              <td style="color:var(--muted)">Multi-file changes, "why does this fail?", API design, SQL queries</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text);font-weight:600">Sonnet 4.6</td>
+              <td><span class="ef ef-high">high</span></td>
+              <td style="color:var(--muted)">~8–12k tokens</td>
+              <td style="color:var(--accent2);font-family:var(--mono)">$3 / $15 + think</td>
+              <td>Complex features</td>
+              <td style="color:var(--muted)">Architecture decisions, hard performance issues, security audit</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text);font-weight:600">Opus 4.7</td>
+              <td><span class="ef ef-medium">medium</span></td>
+              <td style="color:var(--muted)">~4k tokens</td>
+              <td style="color:#ffa000;font-family:var(--mono)">$5 / $25 + think</td>
+              <td>Critical decisions</td>
+              <td style="color:var(--muted)">System design, production incidents, compliance review, tech lead tasks</td>
+            </tr>
+            <tr>
+              <td style="color:var(--text);font-weight:600">Opus 4.7</td>
+              <td><span class="ef ef-xhigh">xhigh</span></td>
+              <td style="color:var(--muted)">&gt;12k tokens</td>
+              <td style="color:#ff5050;font-family:var(--mono)">$5 / $25 + think</td>
+              <td>Research &amp; hard math</td>
+              <td style="color:var(--muted)">Novel algorithms, deep optimization, open-ended research, PhD-level problems</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:8px;line-height:1.6">
+        💡 Tip: thinking tokens bill at output rate. Sonnet high = $15/MTok thinking + $15/MTok output.
+        Set <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;color:#374151">effortLevel: "medium"</code>
+        in <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;color:#374151">~/.claude/settings.json</code>
+        as default — use high/xhigh only when you need deep reasoning.
+      </div>
+    </div>
+  </div>
+
+  <!-- Trend + Activity side by side -->
+  <div class="grid-2 section" style="grid-template-columns:1.3fr 1fr;margin-bottom:14px">
+    <div class="trend-card" style="margin-bottom:0">
+      <div class="card-title" id="trend-title">Spend Trend</div>
+      <div class="trend-chart-area">
+        <div class="trend-y-axis" id="trend-y-axis"></div>
+        <div class="trend-chart-inner">
+          <div class="trend-gridlines">
+            <div class="trend-gridline" style="top:0%"></div>
+            <div class="trend-gridline" style="top:50%"></div>
+            <div class="trend-gridline" style="top:100%"></div>
+          </div>
+          <div class="trend-bars" id="trend-bars"></div>
+          <div class="trend-axis" id="trend-axis"></div>
+        </div>
+      </div>
+      <div class="trend-axis-label" id="trend-axis-label"></div>
+    </div>
+    <div class="card" id="task-card" style="display:none">
+      <div class="card-title">By Activity — what is Claude doing?</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px">Bar width = % of cost · 1-shot = answered in 1 turn, no tools · hover rows for details</div>
+      <table id="task-tbody-wrap">
+        <thead><tr>
+          <th>Activity</th><th>Turns</th><th>1-shot</th><th>Avg input</th><th>Total $</th>
+        </tr></thead>
+        <tbody id="task-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ COST BREAKDOWN ════════════════════════════════════════════ -->
+<div id="breakdown" class="sec-anchor">
+<div class="sec-label">Breakdown — where the money goes</div>
+  <div class="breakdown-row" style="margin-bottom:14px">
+    <div class="bd-card">
+      <div class="bd-label">Output tokens <span style="color:var(--muted);font-size:8px">(5× more than input)</span></div>
+      <div class="bd-value" id="bd-output" style="color:var(--warn)">—</div>
+      <div class="bd-pct" id="bd-output-pct">— of total</div>
+      <div class="bd-bar"><div class="bd-bar-fill" id="bd-output-bar" style="background:var(--warn);width:0%"></div></div>
+    </div>
+    <div class="bd-card">
+      <div class="bd-label">Cache write <span style="color:var(--muted);font-size:8px">(pays off after reuse)</span></div>
+      <div class="bd-value" id="bd-cw" style="color:var(--accent2)">—</div>
+      <div class="bd-pct" id="bd-cw-pct">— of total</div>
+      <div class="bd-bar"><div class="bd-bar-fill" id="bd-cw-bar" style="background:var(--accent2);width:0%"></div></div>
+    </div>
+    <div class="bd-card">
+      <div class="bd-label">Input tokens <span style="color:var(--muted);font-size:8px">(base rate)</span></div>
+      <div class="bd-value" id="bd-input" style="color:var(--text)">—</div>
+      <div class="bd-pct" id="bd-input-pct">— of total</div>
+      <div class="bd-bar"><div class="bd-bar-fill" id="bd-input-bar" style="background:var(--muted);width:0%"></div></div>
+    </div>
+    <div class="bd-card">
+      <div class="bd-label">Cache read <span style="color:var(--good);font-size:8px">(10% of base — saved)</span></div>
+      <div class="bd-value" id="bd-cr" style="color:var(--good)">—</div>
+      <div class="bd-pct" id="bd-cr-pct">10% of input price</div>
+      <div class="bd-bar"><div class="bd-bar-fill" id="bd-cr-bar" style="background:var(--good);width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- By Source + By Model -->
+  <div class="grid-2" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-title">By Source — where are you spending?</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px">Bar width = % of total cost · hover for details</div>
+      <div id="by-source"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">By Model — cost · cache · 1-shot rate</div>
+      <div class="table-wrap"><table id="by-model-table">
+        <thead><tr>
+          <th>Model</th><th>Cost</th><th>Cache</th><th>Calls</th><th>1-shot</th>
+        </tr></thead>
+        <tbody id="by-model-tbody"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROJECTS + ANALYSIS ══════════════════════════════════════ -->
+<div id="projects" class="sec-anchor">
+<div class="sec-label">Projects — cost by codebase</div>
+
+  <div class="grid-3" style="margin-bottom:14px">
+    <div class="card">
+      <div class="card-title" style="color:#16a34a;border-color:#bbf7d0">By Project</div>
+      <div class="table-wrap">
+        <table id="by-project-table">
+          <thead><tr>
+            <th>Project</th><th>Cost</th><th>Avg/sess</th><th>Sess</th><th>Calls</th>
+          </tr></thead>
+          <tbody id="by-project-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:#dc2626;border-color:#fecaca">Top Sessions</div>
+      <div class="table-wrap">
+        <table id="top-sessions-table">
+          <thead><tr>
+            <th>Date</th><th>Project</th><th>Cost</th><th>Calls</th>
+          </tr></thead>
+          <tbody id="top-sessions-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" id="tools-card-combined">
+      <div class="card-title">Core Tools &amp; MCP</div>
+      <div id="core-tools-card" style="display:none">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;font-weight:600">Core Tools</div>
+        <div id="core-tools"></div>
+      </div>
+      <div id="mcp-servers-card" style="display:none;margin-top:14px">
+        <div style="font-family:var(--mono);font-size:10px;color:#7c3aed;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;font-weight:600">MCP Servers</div>
+        <div id="mcp-servers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shell commands (full-width when visible) -->
+  <div class="card section" id="shell-cmds-card" style="display:none;margin-bottom:14px">
+    <div class="card-title" style="color:#ea580c;border-color:#fed7aa">Shell Commands — individual bash calls</div>
+    <div id="shell-cmds"></div>
+  </div>
+  <div id="proj-placeholder" style="display:none"></div>
+
+</div>
+
+<div id="analysis" class="sec-anchor">
+<div class="sec-label">Analysis — tools &amp; effort patterns</div>
+  <!-- Effort breakdown (shown inline when available) -->
+  <div class="card section" id="effort-card" style="margin-bottom:14px;display:none">
+    <div class="card-title">Model × Effort — actual usage breakdown</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Model</th><th>Effort</th><th>Requests</th>
+          <th>Total $</th><th>Avg $/req</th><th>Avg output tok</th>
+        </tr></thead>
+        <tbody id="effort-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ACTIVITY ══════════════════════════════════════════════════ -->
+<div id="activity" class="sec-anchor">
+<div class="sec-label">Activity — spend patterns over time</div>
+
+  <!-- Annual heatmap -->
+  <div class="hm-wrap">
+    <div class="card-title">Daily Spend — Last 365 Days (each cell = one day, number = $ spent)</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px">Y axis = day of week (Mon–Sun) · X axis = weeks (→ = more recent) · color = spend intensity · hover for exact date + cost</div>
+    <div class="hm-inner">
+      <div class="hm-day-labels">
+        <span></span><span>Mon</span><span></span><span>Wed</span>
+        <span></span><span>Fri</span><span></span>
+      </div>
+      <div class="hm-right">
+        <div class="hm-months" id="hm-months"></div>
+        <div class="hm-grid"   id="hm-grid"></div>
+        <div class="hm-legend">
+          <span>$0</span>
+          <div class="hm-legend-cell" style="background:#f0f2f7;border:1px solid #dde1ea"></div>
+          <div class="hm-legend-cell" style="background:#bbf7d0"></div>
+          <div class="hm-legend-cell" style="background:#4ade80"></div>
+          <div class="hm-legend-cell" style="background:#16a34a"></div>
+          <div class="hm-legend-cell" style="background:#15803d"></div>
+          <span>high $</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hourly heatmap -->
+  <div class="hourly-wrap">
+    <div class="card-title">Spend by Hour of Day — All Time (each cell = total $ spent · number below = total requests)</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px">Y axis = day of week · X axis = hour 00:00–23:00 · color = total $ spent · hover for hour + cost + requests</div>
+    <div class="hourly-inner">
+      <div class="hourly-day-labels" id="hourly-day-labels"></div>
+      <div class="hourly-grid-wrap">
+        <div class="hourly-hour-labels" id="hourly-hour-labels"></div>
+        <div class="hourly-grid" id="hourly-grid"></div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:6px;text-align:right">
+          X axis = hour of day (00:00–23:00) · Y axis = day of week · cell = total $ · right column = sum for that day · rows: oldest → newest (today at bottom)
+        </div>
+      </div>
+      <div class="hourly-totals" id="hourly-totals">
+        <div class="hourly-totals-header">Total</div>
+        <!-- filled by JS -->
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<hr class="section-sep">
+
+<div id="sessions" class="sec-anchor"
+style="display:contents"></div>
+<div class="sec-label">Sessions — work sessions grouped by 30 min gap</div>
+<div id="sessions-card" class="card section" style="margin-bottom:14px">
+  <div class="card-title">Sessions — each row is one work session (gap > 30 min = new session)</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px">Wall Time = clock time · API Time = actual LLM compute · Efficiency = API/Wall · scroll horizontally if needed</div>
+  <div class="table-wrap">
+  <table style="min-width:800px">
+    <thead><tr>
+      <th style="min-width:130px">Start</th>
+      <th style="min-width:80px">Wall</th>
+      <th style="min-width:80px">API</th>
+      <th style="min-width:80px">Efficiency</th>
+      <th style="min-width:80px">Source</th>
+      <th style="min-width:50px;text-align:right">Reqs</th>
+      <th style="min-width:90px;text-align:right">Input</th>
+      <th style="min-width:90px;text-align:right">Output</th>
+      <th style="min-width:140px">Top Tools</th>
+      <th style="min-width:80px;text-align:right">Total $</th>
+    </tr></thead>
+    <tbody id="sessions-body"></tbody>
+    <tfoot id="sessions-foot"></tfoot>
+  </table>
+  </div>
+  <div class="pager">
+    <button class="pager-btn" id="pg-prev" onclick="pageChange(-1)">← Prev</button>
+    <span class="pager-info" id="pg-info"></span>
+    <button class="pager-btn" id="pg-next" onclick="pageChange(+1)">Next →</button>
+  </div>
+</div>
+
+<div id="requests" class="sec-anchor" style="display:contents"></div>
+<div class="sec-label">Requests — individual API calls</div>
+
+<div class="card" style="margin-bottom:14px">
+  <div class="card-title">Recent 20 Requests</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px">Live — last 20 API calls captured by proxy · scroll horizontally if needed</div>
+  <div class="table-wrap">
+    <table style="min-width:860px">
+      <thead><tr>
+        <th style="min-width:110px">Time</th>
+        <th style="min-width:90px">Source</th>
+        <th style="min-width:120px">Model</th>
+        <th style="min-width:70px;text-align:right">In</th>
+        <th style="min-width:90px;text-align:right">Cache↑</th>
+        <th style="min-width:70px;text-align:right">Out</th>
+        <th style="min-width:55px;text-align:right">Tools</th>
+        <th style="min-width:60px">Stop</th>
+        <th style="min-width:80px;text-align:right">Cost $</th>
+        <th style="min-width:60px;text-align:right">Lat</th>
+        <th style="min-width:30px;text-align:center">✓</th>
+      </tr></thead>
+      <tbody id="recent-body"></tbody>
+    </table>
+  </div>
+  <div id="empty-msg" class="empty" style="display:none">
+    No requests yet — set <code style="color:var(--accent)">ANTHROPIC_BASE_URL=http://localhost:8082</code>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:14px">
+  <div class="card-title">Top 10 Most Expensive Requests</div>
+  <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.5px">Highest cost single API calls across all time</div>
+  <div class="table-wrap">
+    <table style="min-width:820px">
+      <thead><tr>
+        <th style="min-width:110px">Time</th>
+        <th style="min-width:90px">Source</th>
+        <th style="min-width:120px">Model</th>
+        <th style="min-width:70px;text-align:right">In</th>
+        <th style="min-width:90px;text-align:right">Cache↑</th>
+        <th style="min-width:70px;text-align:right">Out</th>
+        <th style="min-width:55px;text-align:right">Tools</th>
+        <th style="min-width:60px">Stop</th>
+        <th style="min-width:80px;text-align:right">Cost $</th>
+        <th style="min-width:60px;text-align:right">Lat</th>
+      </tr></thead>
+      <tbody id="top-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+  <div style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="sync-note">log sync: —</div>
+  <div class="refresh-note" id="refresh-note">refreshing every 3s</div>
+</div>
+</main>
+
+<!-- ══ OPTIMIZER VIEW ════════════════════════════════════════════ -->
+<div id="optimizer-view" style="display:none;padding:20px 28px">
+  <div class="sec-label" style="margin-bottom:16px">Optimizer — automatic savings · savings by type · ROI</div>
+
+  <!-- Legend: all optimization techniques -->
+  <div class="card" style="padding:16px 20px;margin-bottom:18px;background:#f8fafc">
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px;font-weight:700">Optimization techniques — legend</div>
+    <div id="opt-legend" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"></div>
+  </div>
+
+  <!-- Hero KPIs row -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px">
+    <div class="card" style="padding:16px 20px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">TOTAL SAVED</div>
+      <div id="opt-saved" style="font-size:28px;font-weight:700;color:#16a34a;letter-spacing:-1px">—</div>
+      <div id="opt-saved-detail" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px"></div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">ACTUAL SPENT</div>
+      <div id="opt-spent" style="font-size:28px;font-weight:700;color:var(--hi);letter-spacing:-1px">—</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px">What was actually charged to Anthropic. Without caching you'd pay ~<span id="opt-would-have" style="font-weight:600;color:var(--hi)"></span>.</div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">OPTIMIZER ROI</div>
+      <div id="opt-roi" style="font-size:28px;font-weight:700;color:#0ea5e9;letter-spacing:-1px">—</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px">saved / (saved + spent) × 100. E.g. 82% = proxy saved 82¢ of every $1 of potential spend.</div>
+    </div>
+    <div class="card" style="padding:16px 20px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">MONTHLY PROJ.</div>
+      <div id="opt-monthly" style="font-size:28px;font-weight:700;color:#7c3aed;letter-spacing:-1px">—</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px">saved_per_day × 30. <span id="opt-monthly-basis" style="color:var(--muted)"></span>. Reflects current pace.</div>
+    </div>
+  </div>
+
+  <!-- Savings breakdown + bar -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 18px 10px;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)">Savings by Type</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:#f9fafb">
+          <th style="padding:7px 18px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Type</th>
+          <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Saved $</th>
+          <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Reqs</th>
+          <th style="padding:7px 18px 7px 8px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Share</th>
+        </tr></thead>
+        <tbody id="opt-type-tbody"></tbody>
+      </table>
+    </div>
+    <div class="card" style="padding:16px 18px">
+      <div style="font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:14px">Cost vs Savings breakdown</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:10px">Red = what you paid · green = what you saved</div>
+      <div id="opt-bar-chart" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+  </div>
+
+  <!-- Smart Routing log -->
+  <div class="card" style="padding:0;overflow:hidden;margin-bottom:18px">
+    <div style="padding:12px 18px 10px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)">
+      <span style="font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">⚡ Smart Routing — model switch log</span>
+      <span id="opt-routing-count" style="font-family:var(--mono);font-size:11px;color:#0ea5e9"></span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:auto">score ≤ 2 → Haiku · score 3–5 + Opus → Sonnet</span>
+    </div>
+    <div class="table-wrap">
+      <table style="min-width:700px;width:100%;border-collapse:collapse">
+        <thead><tr style="background:#f9fafb">
+          <th style="padding:7px 18px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Time</th>
+          <th style="padding:7px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Source</th>
+          <th style="padding:7px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Original</th>
+          <th style="padding:7px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Routed to</th>
+          <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">In tok avg</th>
+          <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Out tok avg</th>
+          <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Effort</th>
+          <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Paid $</th>
+          <th style="padding:7px 18px 7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Saved $</th>
+        </tr></thead>
+        <tbody id="opt-routing-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Daily trend -->
+  <div class="card" style="padding:16px 18px;margin-bottom:18px">
+    <div style="font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Daily Savings Trend</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px">Savings per day. Available for 7d/30d periods only.</div>
+    <div id="opt-daily-chart" style="display:flex;align-items:flex-end;gap:4px;height:80px;overflow-x:auto"></div>
+    <div id="opt-daily-axis" style="display:flex;gap:4px;margin-top:4px;font-family:var(--mono);font-size:9px;color:var(--muted)"></div>
+  </div>
+
+  <div style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;padding:8px 0" id="opt-refresh-note"></div>
+</div>
+
+<!-- ══ RAW LOGS VIEW ══════════════════════════════════════════════ -->
+<div id="raw-logs-view">
+  <div class="sec-label" style="margin-bottom:14px">RAW Logs — last 500 requests · prompt body · model · cost</div>
+  <div id="compact-banner" style="display:none;margin-bottom:12px;padding:10px 16px;border-radius:8px;background:#fef3c7;border:1px solid #f59e0b;font-size:12px;font-family:var(--mono);color:#92400e;display:flex;align-items:center;gap:10px">
+    <span style="font-size:16px">⚠️</span>
+    <span id="compact-banner-text"></span>
+    <span style="margin-left:auto;color:#b45309;font-weight:600">→ type <code style="background:#fde68a;padding:1px 6px;border-radius:3px">/compact</code> in VS Code to compress context</span>
+  </div>
+  <div class="rl-toolbar">
+    <input class="rl-search" id="rl-search" type="text" placeholder="Filter: prompt, model, source…" oninput="renderRawLogs()">
+    <button class="rl-filter-btn active" data-tier="all"    onclick="setTierFilter(this)">All</button>
+    <button class="rl-filter-btn"        data-tier="haiku"  onclick="setTierFilter(this)">Haiku</button>
+    <button class="rl-filter-btn"        data-tier="sonnet" onclick="setTierFilter(this)">Sonnet</button>
+    <button class="rl-filter-btn"        data-tier="opus"   onclick="setTierFilter(this)">Opus</button>
+    <button class="rl-filter-btn"        data-tier="other"  onclick="setTierFilter(this)">Other</button>
+    <span class="rl-count" id="rl-count"></span>
+    <button class="rl-filter-btn rl-refresh-toggle active" id="rl-refresh-toggle" onclick="toggleAutoRefresh()" style="margin-left:4px">↺ Refresh ON</button>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="table-wrap">
+      <table id="rl-table" style="min-width:960px">
+        <thead><tr>
+          <th style="min-width:40px;text-align:right">#</th>
+          <th style="min-width:130px">Time</th>
+          <th style="min-width:90px">Source</th>
+          <th style="min-width:130px">Model</th>
+          <th style="min-width:65px;text-align:right">In</th>
+          <th style="min-width:65px;text-align:right">Cache↑</th>
+          <th style="min-width:65px;text-align:right">Out</th>
+          <th style="min-width:45px;text-align:right">Tools</th>
+          <th style="min-width:95px">Activity</th>
+          <th style="min-width:55px">Stop</th>
+          <th style="min-width:80px;text-align:right">Cost $</th>
+          <th style="min-width:55px;text-align:right">Lat</th>
+          <th style="min-width:70px">Effort</th>
+          <th>Prompt</th>
+        </tr></thead>
+        <tbody id="rl-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;padding:8px 0" id="rl-refresh-note"></div>
+</div>
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const fmt     = n  => n == null ? '—' : Number(n).toLocaleString();
+const fmtCost = c  => c == null || c === 0 ? '—' : '$' + Number(c).toFixed(4);
+const fmtCost2= c  => c == null ? '—' : '$' + Number(c).toFixed(2);
+const fmtCost5= c  => c == null ? '—' : '$' + Number(c).toFixed(5);
+const fmtPct  = n  => n == null ? '—' : Number(n).toFixed(1) + '%';
+const fmtTime = ts => new Date(ts).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const fmtDate = ts => {
+  const d = new Date(ts);
+  return d.toLocaleDateString('en',{month:'short',day:'numeric'}) + ' ' +
+         d.toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
+};
+function fmtExecTime(ms) {
+  if (ms == null || ms === 0) return '—';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `0:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function cellCost(c) {
+  if (!c || c === 0) return '';
+  if (c >= 10) return '$' + Math.round(c);
+  if (c >= 1)  return '$' + c.toFixed(1);
+  if (c >= 0.1) return '$.' + String(Math.round(c * 100)).padStart(2,'0');
+  return '$.' + String(Math.round(c * 1000)).padStart(3,'0');
+}
+
+// ── Task Breakdown ────────────────────────────────────────────────────────────
+const TASK_META = {
+  coding:       { label: 'Coding',       color: '#2563eb', icon: '✏️' },
+  feature_dev:  { label: 'Feature Dev',  color: '#7c3aed', icon: '🚀' },
+  testing:      { label: 'Testing',      color: '#0891b2', icon: '🧪' },
+  build_run:    { label: 'Build / Run',  color: '#dc2626', icon: '⚡' },
+  debugging:    { label: 'Debugging',    color: '#ea580c', icon: '🐛' },
+  delegation:   { label: 'Delegation',   color: '#d97706', icon: '🤖' },
+  web:          { label: 'Web Search',   color: '#0891b2', icon: '🌐' },
+  planning:     { label: 'Planning',     color: '#16a34a', icon: '📋' },
+  exploration:  { label: 'Exploration',  color: '#6b7280', icon: '🔍' },
+  mcp:          { label: 'MCP Tools',    color: '#9333ea', icon: '🔌' },
+  conversation: { label: 'Conversation', color: '#4b5563', icon: '💬' },
+  // legacy keys
+  code: {label:'Coding',color:'#2563eb',icon:'✏️'}, bash:{label:'Build / Run',color:'#dc2626',icon:'⚡'},
+  agent:{label:'Delegation',color:'#d97706',icon:'🤖'}, plan:{label:'Planning',color:'#16a34a',icon:'📋'},
+  search:{label:'Exploration',color:'#6b7280',icon:'🔍'}, chat:{label:'Conversation',color:'#4b5563',icon:'💬'},
+};
+const TOOL_GROUP_JS = {
+  Edit:'coding', Write:'coding', MultiEdit:'coding', NotebookEdit:'coding',
+  Bash:'bash',
+  Agent:'delegation', TaskOutput:'delegation', TaskStop:'delegation',
+  WebFetch:'web', WebSearch:'web',
+  TodoWrite:'planning', EnterPlanMode:'planning', ExitPlanMode:'planning',
+  Read:'exploration', Glob:'exploration', Grep:'exploration',
+};
+function classifyTools(tools) {
+  if (!tools || !tools.length) return 'conversation';
+  const groups = new Set();
+  let hasMcp = false;
+  for (const t of tools) {
+    const g = TOOL_GROUP_JS[t];
+    if (g) groups.add(g);
+    else if (String(t).startsWith('mcp__')) hasMcp = true;
+  }
+  const hasBash = groups.has('bash'), hasCoding = groups.has('coding');
+  const hasTest = hasBash && hasCoding && tools.length >= 3;
+  if (groups.has('delegation'))                          return 'delegation';
+  if (hasCoding && groups.has('planning'))               return 'feature_dev';
+  if (hasCoding && hasBash && hasTest)                   return 'testing';
+  if (hasCoding)                                         return 'coding';
+  if (hasBash && groups.has('exploration'))              return 'debugging';
+  if (hasBash)                                           return 'build_run';
+  if (groups.has('web'))                                 return 'web';
+  if (groups.has('planning'))                            return 'planning';
+  if (groups.has('exploration'))                         return 'exploration';
+  if (hasMcp)                                            return 'mcp';
+  return 'conversation';
+}
+function renderTaskBreakdown(tasks) {
+  const card = document.getElementById('task-card');
+  if (!tasks || !tasks.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const tip      = document.getElementById('hm-tooltip');
+  const maxCost  = Math.max(...tasks.map(t => t.cost), 0.0001);
+  const totalCost = tasks.reduce((s, t) => s + (t.cost || 0), 0);
+  const totalReqs = tasks.reduce((s, t) => s + (t.reqs || 0), 0);
+  const fmtK = n => n >= 1000 ? Math.round(n/1000) + 'k' : String(n);
+  const tbody = document.getElementById('task-tbody');
+  tbody.innerHTML = tasks.map(t => {
+    const m    = TASK_META[t.category] || {label: t.category, color: '#9ca3af', icon: '?'};
+    const barW = Math.round(t.cost / maxCost * 80);
+    const pct  = totalCost > 0 ? (t.cost/totalCost*100).toFixed(1) : '0';
+    const oneShotCell = t.one_shot_pct != null
+      ? `<span style="color:${t.one_shot_pct>=70?'var(--good)':t.one_shot_pct>=40?'var(--accent2)':'var(--muted)'}">${t.one_shot_pct}%</span>`
+      : '<span class="c-muted">—</span>';
+    const tipTxt = `${m.label}  ·  ${fmtCost(t.cost)}  ·  ${pct}% of total  ·  ${t.reqs} turns  ·  avg input ${fmtK(t.avg_input)} tok${t.one_shot_pct!=null?'  ·  '+t.one_shot_pct+'% 1-shot':''}`;
+    return `<tr style="cursor:crosshair" data-tip="${tipTxt.replace(/"/g,'&quot;')}">
+      <td style="font-family:var(--mono);font-size:12px;white-space:nowrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="task-bar" style="width:${barW}px;background:${m.color};opacity:.75;flex-shrink:0"></div>
+          <span style="font-size:13px">${m.icon}</span> ${m.label}
+        </div>
+      </td>
+      <td class="c-muted">${t.reqs}</td>
+      <td>${oneShotCell}</td>
+      <td class="c-muted" style="font-family:var(--mono);font-size:11px">${fmtK(t.avg_input)}</td>
+      <td class="c-ok">${fmtCost(t.cost)}</td>
+    </tr>`;
+  }).join('') + `<tr class="tfoot-total">
+    <td>TOTAL</td><td>${totalReqs}</td><td>—</td><td>—</td>
+    <td class="c-ok">${fmtCost(totalCost)}</td>
+  </tr>`;
+  tbody.querySelectorAll('[data-tip]').forEach(row => {
+    const t = row.dataset.tip;
+    row.addEventListener('mouseenter', () => { tip.textContent = t; tip.style.display = 'block'; });
+    row.addEventListener('mousemove',  e  => { tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-32)+'px'; });
+    row.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  });
+}
+
+function renderActionPlan(ap, hg) {
+  const wrap = document.getElementById('ap-wrap');
+  if (!ap || !ap.actions || !ap.actions.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  // Health grade in ap-header
+  const gc = document.getElementById('ap-grade-circle');
+  if (hg) {
+    gc.style.display = '';
+    gc.style.color   = hg.color;
+    document.getElementById('ap-grade-letter').textContent = hg.grade;
+    document.getElementById('ap-grade-score').textContent  = hg.score + '/100';
+    document.getElementById('ap-grade-hint').innerHTML =
+      (hg.details || []).map(d => `· ${d}`).join('<br>') || '';
+  } else {
+    gc.style.display = 'none';
+  }
+
+  document.getElementById('ap-today').textContent     = '$' + Number(ap.today_cost).toFixed(2);
+  document.getElementById('ap-proj').textContent      = '$' + Number(ap.monthly_projection).toFixed(2);
+  document.getElementById('ap-optimized').textContent = '$' + Number(ap.optimized_monthly).toFixed(2);
+
+  const saved    = ap.total_monthly_saving || 0;
+  const proj     = ap.monthly_projection   || 0;
+  const savePct  = proj > 0 ? Math.min(Math.round(saved / proj * 100), 90) : 0;
+  document.getElementById('ap-save-pill').textContent =
+    `save $${saved.toFixed(0)}/mo (${savePct}%)`;
+
+  const CERTAINTY = {
+    exact:    ['ap-badge-exact',    'exact'],
+    estimate: ['ap-badge-estimate', '~estimate'],
+    rough:    ['ap-badge-rough',    '≈rough'],
+  };
+  const prefix = c => c === 'exact' ? '' : c === 'estimate' ? '~' : '≈';
+
+  document.getElementById('ap-rows').innerHTML = ap.actions.map(a => {
+    const [cls, lbl] = CERTAINTY[a.certainty] || CERTAINTY.rough;
+    const p   = prefix(a.certainty);
+    const pct = proj > 0 ? Math.min(Math.round(Number(a.monthly_saving) / proj * 100), 90) : 0;
+
+    // Cache TTL detail block
+    let detailHtml = '';
+    if (a.id === 'cache1h' && a.cache_detail) {
+      const cd  = a.cache_detail;
+      const pa  = a.pause;
+      const rec = pa ? pa.recommendation : null;
+
+      // Pause pattern summary (text only)
+      let pauseHtml = '';
+      if (pa && pa.within_gaps > 0) {
+        const why = pa.recommendation === '1h'
+          ? `${pa.mid_count} pauses in 5–60 min range (${pa.mid_per_day}/day) → cache expired → re-write at 1.25×. With 1h: those become reads at 0.10×.`
+          : `${pa.hot_pct}% of pauses are &lt; 5 min — cache stays warm. Paying 2× write for 1h would cost more than the ${pa.mid_count} occasional re-writes it'd prevent.`;
+        pauseHtml = `
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:11px;color:#6b7280;line-height:1.6">
+            <span style="color:#374151;font-weight:600">Your pattern:</span>
+            ${pa.hot_pct}% continuous (&lt;5 min avg ${pa.avg_gap_min} min) · ${pa.mid_pct}% pauses 5–60 min · ${pa.long_pct}% &gt;1h
+            &nbsp;·&nbsp; ${pa.sessions} session${pa.sessions!==1?'s':''} / ${pa.within_gaps} gaps analyzed.<br>
+            ${why}
+          </div>`;
+      }
+
+      // Verdict banner
+      const verdictBg   = rec === '1h' ? '#fff7ed' : '#f0fdf4';
+      const verdictBdr  = rec === '1h' ? '#fed7aa' : '#bbf7d0';
+      const verdictClr  = rec === '1h' ? '#c2410c' : '#15803d';
+      const verdictIcon = rec === '1h' ? '⚠️' : '✅';
+      const verdictText = rec === '1h'
+        ? `Enable 1h TTL — ~${pa ? pa.mid_per_day : '?'} cache expiries/day cost extra re-writes`
+        : (rec === '5min' ? '5 min TTL is optimal for your work pattern' : 'Not enough data for recommendation');
+
+      detailHtml = `
+        <div style="margin-top:10px;font-family:var(--mono);font-size:11px">
+          <div style="background:${verdictBg};border:1px solid ${verdictBdr};border-radius:6px;padding:8px 12px;color:${verdictClr};font-weight:600;font-size:12px">
+            ${verdictIcon} ${verdictText}
+          </div>
+          ${pauseHtml}
+          <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding-top:8px;border-top:1px solid #e2e8f0">
+            <div style="background:#f0f9ff;border:1.5px solid #38bdf8;border-radius:6px;padding:7px 10px">
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+                <div style="color:#0369a1;font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">5 min write cost</div>
+                <span style="background:#0ea5e9;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;letter-spacing:.3px">CURRENT</span>
+              </div>
+              <div style="font-weight:700;color:#0369a1">1.25× base input</div>
+            </div>
+            <div style="padding:7px 10px">
+              <div style="color:#6b7280;font-size:10px;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">1h write cost</div>
+              <div style="font-weight:700;color:#ea580c">2× base input</div>
+            </div>
+            <div style="padding:7px 10px">
+              <div style="color:#6b7280;font-size:10px;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Read cost (both)</div>
+              <div style="font-weight:700;color:#16a34a">0.10× base input</div>
+            </div>
+          </div>
+          <div style="margin-top:6px;color:#6b7280;font-size:10px">
+            Cache writes: <span style="color:#ea580c">$${Number(cd.cw_cost).toFixed(3)}</span> paid (${(cd.cw_tokens/1000).toFixed(0)}k tok) &nbsp;·&nbsp;
+            Cache reads saved: <span style="color:#16a34a">$${Number(cd.cr_saved).toFixed(3)}</span> vs full input price &nbsp;·&nbsp;
+            Hit rate: <span style="color:${cd.hit_rate > 60 ? '#16a34a' : '#ea580c'}">${cd.hit_rate}%</span>
+          </div>
+        </div>`;
+    }
+
+    const rowCls = a.id === 'cache1h'
+      ? (a.pause?.recommendation === '1h' ? 'ap-row ap-row-ttl-warn' : 'ap-row ap-row-ttl-ok')
+      : 'ap-row';
+    return `<div class="${rowCls}">
+      <div>
+        <div class="ap-action-title">
+          ${a.title}
+          <span class="ap-badge ${cls}">${lbl}</span>
+        </div>
+        <div class="ap-action-desc">${a.description}</div>
+        ${detailHtml}
+      </div>
+      <div class="ap-cell-saving">
+        <div class="ap-saving-val">${p}$${Number(a.daily_saving).toFixed(2)}</div>
+        <div class="ap-saving-sub">per day</div>
+      </div>
+      <div class="ap-cell-saving">
+        <div class="ap-saving-val">${p}$${Number(a.monthly_saving).toFixed(0)}</div>
+        <div class="ap-saving-sub">per month${pct > 0 ? ` <span style="color:#6b7280;font-size:10px">(${p}${pct}%)</span>` : ''}</div>
+      </div>
+      <div><div class="ap-cmd-wrap">${a.command}</div></div>
+    </div>`;
+  }).join('');
+
+  const totRow = document.getElementById('ap-total-row');
+  if (ap.total_daily_saving > 0) {
+    totRow.style.display = '';
+    document.getElementById('ap-total-day').textContent   = `~$${Number(ap.total_daily_saving).toFixed(2)}/day`;
+    document.getElementById('ap-total-month').textContent = `~$${Number(ap.total_monthly_saving).toFixed(0)}/month`;
+  } else {
+    totRow.style.display = 'none';
+  }
+}
+
+function sourceTag(s) {
+  if (!s || s==='—')    return `<span class="tag tag-other">?</span>`;
+  if (s==='vscode')     return `<span class="tag tag-vscode">VS Code</span>`;
+  if (s==='claude-cli') return `<span class="tag tag-cli">CLI</span>`;
+  if (s==='cursor')     return `<span class="tag tag-cursor">Cursor</span>`;
+  if (s==='litellm')    return `<span class="tag tag-litellm">LiteLLM</span>`;
+  if (s==='openclaw')   return `<span class="tag" style="background:#fefce8;color:#a16207;border:1px solid #fde68a">OpenClaw</span>`;
+  if (s==='python-sdk') return `<span class="tag" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe">Python</span>`;
+  return `<span class="tag tag-other">${s}</span>`;
+}
+
+function stopBadge(r) {
+  if (!r) return '<span class="c-muted">—</span>';
+  if (r === 'end_turn')   return `<span class="stop-end">end</span>`;
+  if (r === 'tool_use')   return `<span class="stop-tool">tool</span>`;
+  if (r === 'max_tokens') return `<span class="stop-max">max!</span>`;
+  return `<span class="c-muted">${r}</span>`;
+}
+
+// ── Period ────────────────────────────────────────────────────────────────────
+let period = 'today';
+function setPeriod(p) {
+  period = p;
+  document.querySelectorAll('.period-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.period === p));
+  hmBuilt = false; hmDataLen = 0;
+  _sessions = []; _sessPage = 0;
+  refresh();
+  refreshProjects();
+}
+
+// ── Annual Heatmap ────────────────────────────────────────────────────────────
+const HM_COLORS = ['#f0f2f7','#bbf7d0','#4ade80','#16a34a','#15803d'];
+const MONTHS    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let hmBuilt = false, hmDataLen = 0;
+
+function buildHeatmap(data) {
+  const dayMap = {};
+  data.forEach(d => { dayMap[d.day] = d; });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - 90);
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+  const weeks = Math.ceil((today - startDate) / (7*86400000)) + 1;
+  const costs = data.map(d => d.total).filter(Boolean).sort((a,b)=>a-b);
+  const th = costs.length
+    ? [costs[Math.floor(costs.length*.25)], costs[Math.floor(costs.length*.50)], costs[Math.floor(costs.length*.75)]]
+    : [0.001, 0.01, 0.1];
+  const level = c => !c ? 0 : c<=th[0] ? 1 : c<=th[1] ? 2 : c<=th[2] ? 3 : 4;
+  const pad   = n => String(n).padStart(2,'0');
+  const monthsEl = document.getElementById('hm-months');
+  const gridEl   = document.getElementById('hm-grid');
+  const tip      = document.getElementById('hm-tooltip');
+
+  monthsEl.style.gridTemplateColumns = `repeat(${weeks},1fr)`;
+  gridEl.style.gridTemplateColumns   = `repeat(${weeks},1fr)`;
+  gridEl.style.gridTemplateRows      = 'repeat(7,36px)';
+  gridEl.innerHTML = monthsEl.innerHTML = '';
+
+  for (let w = 0; w < weeks; w++) {
+    const ws = new Date(startDate); ws.setDate(startDate.getDate() + w*7);
+    const span = document.createElement('span');
+    if (ws.getDate() <= 7) span.textContent = MONTHS[ws.getMonth()];
+    monthsEl.appendChild(span);
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(startDate); dt.setDate(startDate.getDate() + w*7 + d);
+      if (dt > today) continue;
+      const key   = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+      const entry = dayMap[key] || {total:0, reqs:0};
+      const cell  = document.createElement('div');
+      cell.className = 'hm-cell';
+      cell.style.cssText = `background:${HM_COLORS[level(entry.total)]};grid-column:${w+1};grid-row:${d+1}`;
+      const lbl = cellCost(entry.total);
+      if (lbl) {
+        const t = document.createElement('span');
+        t.className = 'hm-cell-lbl';
+        t.textContent = lbl;
+        const lvlN = level(entry.total);
+        t.style.color = lvlN <= 1 ? '#14532d' : 'rgba(255,255,255,.95)';
+        cell.appendChild(t);
+      }
+      const tipText = `${key}  $${(entry.total||0).toFixed(4)}  ${entry.reqs||0} req${entry.reqs!==1?'s':''}`;
+      cell.addEventListener('mouseenter', () => { tip.textContent = tipText; tip.style.display = 'block'; });
+      cell.addEventListener('mousemove',  e  => { tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-32)+'px'; });
+      cell.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+      gridEl.appendChild(cell);
+    }
+  }
+  hmBuilt = true;
+}
+
+// ── Hourly heatmap ────────────────────────────────────────────────────────────
+function buildHourlyHeatmap(hh) {
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const HM_C = ['#f0f2f7','#bfdbfe','#60a5fa','#2563eb','#1d4ed8'];
+  const tip  = document.getElementById('hm-tooltip');
+
+  // Build map keyed by date string -> hour -> data
+  const hhMap = {};
+  (hh||[]).forEach(r => { if (!hhMap[r.day]) hhMap[r.day] = {}; hhMap[r.day][r.hour] = r; });
+  const maxHC = Math.max(...(hh||[]).map(r => r.total_cost||0), 0.0001);
+  const lvl   = c => { const v = c/maxHC; return v<=0?0:v<.25?1:v<.5?2:v<.75?3:4; };
+
+  // Build list of last 7 dates (oldest first, today last)
+  const today = new Date();
+  const toDateStr = d => {
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${day}`;
+  };
+  const DATES = Array.from({length:7}, (_, i) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - (6 - i));
+    return d;
+  });
+  const todayStr = toDateStr(today);
+
+  // Day labels with dates
+  const labelsEl = document.getElementById('hourly-day-labels');
+  if (labelsEl) {
+    labelsEl.innerHTML = DATES.map(d => {
+      const dateStr = d.getDate() + '/' + (d.getMonth() + 1);
+      const dowName = DAYS[d.getDay()];
+      return `<span><span class="dow-name">${dowName}</span><span class="dow-date">${dateStr}</span></span>`;
+    }).join('');
+  }
+
+  const hoursToShow = 24;
+
+  // Hour labels
+  const hourLabelsEl = document.getElementById('hourly-hour-labels');
+  hourLabelsEl.style.setProperty('--hm-cols', hoursToShow);
+  hourLabelsEl.innerHTML =
+    Array.from({length:hoursToShow},(_,h) =>
+      `<div class="hourly-hour-lbl">${String(h).padStart(2,'0')}</div>`
+    ).join('');
+
+  const nowHour = new Date().getHours();
+
+  // Grid
+  const gridEl = document.getElementById('hourly-grid');
+  gridEl.style.setProperty('--hm-cols', hoursToShow);
+  gridEl.innerHTML = '';
+  for (const d of DATES) {
+    const dayStr = toDateStr(d);
+    const dowName = DAYS[d.getDay()];
+    const dateLabel = d.getDate() + '/' + (d.getMonth()+1);
+    const isToday = dayStr === todayStr;
+    for (let h = 0; h < hoursToShow; h++) {
+      const future = isToday && h > nowHour;
+      const e = future ? {total_cost:0, reqs:0} : ((hhMap[dayStr]||{})[h] || {total_cost:0, reqs:0});
+      const cell = document.createElement('div');
+      cell.className = 'hourly-cell';
+      cell.style.background = future ? 'transparent' : HM_C[lvl(e.total_cost||0)];
+      if (e.reqs > 0) {
+        const costSpan = document.createElement('span');
+        costSpan.className = 'hourly-cell-cost';
+        costSpan.textContent = cellCost(e.total_cost) || '';
+        const reqSpan = document.createElement('span');
+        reqSpan.className = 'hourly-cell-reqs';
+        reqSpan.textContent = e.reqs + 'r';
+        cell.appendChild(costSpan);
+        cell.appendChild(reqSpan);
+      }
+      if (!future) {
+        const tipText = `${dowName} ${dateLabel} ${String(h).padStart(2,'0')}:00 — $${(e.total_cost||0).toFixed(4)}, ${e.reqs} req`;
+        cell.addEventListener('mouseenter', () => { tip.textContent = tipText; tip.style.display = 'block'; });
+        cell.addEventListener('mousemove',  ev => { tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY-32)+'px'; });
+        cell.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+      }
+      gridEl.appendChild(cell);
+    }
+  }
+
+  // Totals column
+  const totalsEl = document.getElementById('hourly-totals');
+  totalsEl.innerHTML = '<div class="hourly-totals-header">Total</div>';
+  for (const d of DATES) {
+    const dayStr = toDateStr(d);
+    const dowName = DAYS[d.getDay()];
+    const dateLabel = d.getDate() + '/' + (d.getMonth()+1);
+    const isToday = dayStr === todayStr;
+    let totalCost = 0, totalReqs = 0;
+    for (let h = 0; h < hoursToShow; h++) {
+      if (isToday && h > nowHour) continue;
+      const e = (hhMap[dayStr]||{})[h] || {total_cost:0, reqs:0};
+      totalCost += e.total_cost || 0;
+      totalReqs += e.reqs || 0;
+    }
+    const cell = document.createElement('div');
+    cell.className = 'hourly-total-cell';
+    cell.innerHTML = totalReqs > 0
+      ? `<div class="hourly-total-cost">${totalCost >= 1 ? '$'+totalCost.toFixed(1) : '$'+totalCost.toFixed(2)}</div>
+         <div class="hourly-total-reqs">${totalReqs}r</div>`
+      : `<div class="hourly-total-reqs" style="color:#333">—</div>`;
+    const tipText = `${dowName} ${dateLabel} total — $${totalCost.toFixed(4)}, ${totalReqs} requests`;
+    cell.addEventListener('mouseenter', () => { tip.textContent = tipText; tip.style.display = 'block'; });
+    cell.addEventListener('mousemove',  ev => { tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY-32)+'px'; });
+    cell.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    totalsEl.appendChild(cell);
+  }
+}
+
+// ── Trend chart ───────────────────────────────────────────────────────────────
+function trendAxisLabel(p) {
+  if (p === 'today') return 'X axis = hour of day (00:00 – 23:00)';
+  if (p === '7d')    return 'X axis = day of week';
+  if (p === '30d')   return 'X axis = date';
+  return 'X axis = month';
+}
+
+function trendShortLabel(label, n) {
+  if (!label) return '';
+  if (label.length === 2) return label + ':00'; // hour "14" → "14:00"
+  if (label.length === 10) {
+    const d = new Date(label + 'T12:00:00');
+    if (n <= 8) return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    return d.getDate() + '';
+  }
+  if (label.length === 7) {
+    return MONTHS[parseInt(label.split('-')[1]) - 1];
+  }
+  return label;
+}
+
+function fmtBarLabel(cost, n) {
+  if (!cost || cost === 0) return '';
+  if (n > 20) return cost < 0.1 ? cellCost(cost) : '$' + cost.toFixed(2);  // cellCost already adds $
+  return '$' + cost.toFixed(cost >= 1 ? 2 : 3);
+}
+
+function renderTrend(trend) {
+  const barsEl  = document.getElementById('trend-bars');
+  const axisEl  = document.getElementById('trend-axis');
+  const axisLbl = document.getElementById('trend-axis-label');
+  const titleEl = document.getElementById('trend-title');
+  const tip     = document.getElementById('hm-tooltip');
+
+  const periodLabels = {today:'Today — Spend by Hour', '7d':'Last 7 Days — Daily Spend', '30d':'Last 30 Days — Daily Spend', all:'All Time — Monthly Spend'};
+  titleEl.textContent = periodLabels[period] || 'Spend Trend';
+
+  if (!trend || !trend.length) {
+    barsEl.innerHTML = '<div class="c-muted" style="font-size:12px;font-family:var(--mono);padding:20px">No data for this period</div>';
+    axisEl.innerHTML = '';
+    axisLbl.textContent = '';
+    return;
+  }
+
+  const n       = trend.length;
+  const maxCost = Math.max(...trend.map(d => d.cost), 0.0001);
+  const totalReqs = trend.reduce((s, d) => s + (d.reqs || 0), 0);
+  const showLabelEvery = n <= 8 ? 1 : n <= 16 ? 2 : n <= 24 ? 3 : Math.ceil(n / 10);
+  const maxBarPx = n <= 1 ? 80 : n <= 3 ? 120 : n <= 7 ? 160 : null;
+  const barStyle = maxBarPx ? `flex:1;max-width:${maxBarPx}px` : `flex:1`;
+  barsEl.style.justifyContent = maxBarPx ? 'flex-start' : '';
+
+  // Y-axis: left side with 3 labels (0, mid, max)
+  const yFmt = v => v >= 1 ? '$' + v.toFixed(1) : v >= 0.01 ? '$' + v.toFixed(2) : '$' + v.toFixed(3);
+  const yAxisEl = document.getElementById('trend-y-axis');
+  if (yAxisEl) {
+    yAxisEl.innerHTML = `
+      <span style="position:absolute;top:2px;right:4px">${yFmt(maxCost)}</span>
+      <span style="position:absolute;top:50%;right:4px;transform:translateY(-50%)">${yFmt(maxCost/2)}</span>
+      <span style="position:absolute;bottom:2px;right:4px">$0</span>`;
+  }
+
+  // X-axis label
+  axisLbl.textContent = `${trendAxisLabel(period)}  ·  total ${totalReqs} req${totalReqs!==1?'s':''}`;
+
+  // Build bars with hover tooltip
+  const barDivs = trend.map((d, i) => {
+    const pct   = Math.max(d.cost / maxCost * 100, d.cost > 0 ? 2 : 0);
+    const label = fmtBarLabel(d.cost, n);
+    return {d, pct, label, barStyle};
+  });
+
+  barsEl.innerHTML = barDivs.map(({d, pct, label, barStyle}) => {
+    return `<div class="trend-bar-col" style="position:relative;${barStyle}">
+      ${label ? `<div class="trend-bar-label" style="bottom:calc(${pct}% + 4px);top:auto;position:absolute">${label}</div>` : ''}
+      <div class="trend-bar-fill" style="height:${pct}%"></div>
+    </div>`;
+  }).join('');
+
+  // Attach tooltip events after DOM is built
+  const cols = barsEl.querySelectorAll('.trend-bar-col');
+  trend.forEach((d, i) => {
+    const col = cols[i];
+    if (!col) return;
+    const xLabel = d.label || '';
+    const tipText = `${xLabel}  ·  $${(d.cost||0).toFixed(4)}  ·  ${d.reqs||0} req${(d.reqs||0)!==1?'s':''}`;
+    col.style.cursor = 'crosshair';
+    col.addEventListener('mouseenter', () => { tip.textContent = tipText; tip.style.display = 'block'; });
+    col.addEventListener('mousemove',  e  => { tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-32)+'px'; });
+    col.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  });
+
+  axisEl.style.justifyContent = maxBarPx ? 'flex-start' : '';
+  axisEl.innerHTML = trend.map((d, i) => {
+    const show = i === 0 || i === n-1 || i % showLabelEvery === 0;
+    return `<div class="trend-lbl" style="${barStyle}">${show ? trendShortLabel(d.label, n) : ''}</div>`;
+  }).join('');
+}
+
+// ── Sessions pagination ───────────────────────────────────────────────────────
+let _sessions = [], _sessPage = 0;
+const SESS_PER = 10;
+
+function pageChange(delta) {
+  _sessPage = Math.max(0, Math.min(_sessPage + delta, Math.floor((_sessions.length-1)/SESS_PER)));
+  renderSessPage();
+}
+function renderSessPage() {
+  const start = _sessPage * SESS_PER;
+  const page  = _sessions.slice(start, start + SESS_PER);
+  const total = _sessions.length;
+  document.getElementById('pg-info').textContent =
+    total ? `${start+1}–${Math.min(start+SESS_PER,total)} of ${total}` : '0';
+  document.getElementById('pg-prev').disabled = _sessPage === 0;
+  document.getElementById('pg-next').disabled = _sessPage >= Math.ceil(total/SESS_PER)-1;
+  const fmtTok = n => !n ? '—' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1000 ? Math.round(n/1000)+'k' : String(n);
+  const tokCell = (tok, cost) => tok
+    ? `<span style="font-family:var(--mono)">${fmtTok(tok)}</span><br><span style="color:#9ca3af;font-size:10px">$${Number(cost||0).toFixed(3)}</span>`
+    : '—';
+  const tbody = document.getElementById('sessions-body');
+  if (!page.length) { tbody.innerHTML = `<tr><td colspan="10" class="empty">No sessions yet</td></tr>`; return; }
+  tbody.innerHTML = page.map(s => `
+    <tr>
+      <td class="c-muted">${fmtDate(s.start)}</td>
+      <td class="c-muted">${s.wall_fmt||'—'}</td>
+      <td class="c-muted">${s.api_fmt||'—'}</td>
+      <td class="${(s.efficiency||0)>50?'c-ok':'c-muted'}">${s.efficiency!=null?s.efficiency+'%':'—'}</td>
+      <td>${(s.sources||[]).map(sourceTag).join(' ')}</td>
+      <td class="c-muted">${s.req_count}</td>
+      <td class="c-muted">${tokCell(s.total_input, s.input_cost)}</td>
+      <td class="c-muted">${tokCell(s.total_output, s.output_cost)}</td>
+      <td class="c-muted" style="font-size:10px">${(s.top_tools||[]).slice(0,3).map(t=>`${t.name}×${t.count}`).join(' ')||'—'}</td>
+      <td class="c-ok">${fmtCost(s.total_cost)}</td>
+    </tr>`).join('');
+  // Totals over ALL sessions (not just page)
+  const sessTot = _sessions.reduce((a,s) => ({
+    reqs: a.reqs+(s.req_count||0), cost: a.cost+(s.total_cost||0),
+    inp: a.inp+(s.total_input||0), out: a.out+(s.total_output||0),
+    inpCost: a.inpCost+(s.input_cost||0), outCost: a.outCost+(s.output_cost||0),
+  }), {reqs:0, cost:0, inp:0, out:0, inpCost:0, outCost:0});
+  document.getElementById('sessions-foot').innerHTML = `
+    <tr class="tfoot-total">
+      <td colspan="5">TOTAL (${total} sessions)</td>
+      <td>${sessTot.reqs}</td>
+      <td>${tokCell(sessTot.inp, sessTot.inpCost)}</td>
+      <td>${tokCell(sessTot.out, sessTot.outCost)}</td>
+      <td>—</td>
+      <td class="c-ok">${fmtCost(sessTot.cost)}</td>
+    </tr>`;
+}
+
+// ── Main refresh ─────────────────────────────────────────────────────────────
+async function refresh() {
+  let d;
+  try { d = await fetch(`/stats?period=${period}`).then(r => r.json()); }
+  catch(e) { return; }
+
+  const s  = d.summary || {};
+  const bd = d.cost_breakdown || {};
+
+  // ── Hero KPIs
+  document.getElementById('hk-cost').textContent =
+    s.total_cost != null ? '$' + Number(s.total_cost).toFixed(2) : '—';
+
+  const proj = d.projection;
+  document.getElementById('hk-proj').textContent =
+    proj != null && proj > 0 ? '~$' + proj.toFixed(2) : '—';
+  const projSubLabels = {today:"at today's rate × 30", '7d':"at current 7-day rate", '30d':"at current 30-day rate", all:"at current 7-day rate"};
+  const projSubEl = document.getElementById('hk-proj-sub');
+  if (projSubEl) projSubEl.textContent = projSubLabels[period] || 'monthly estimate';
+
+  const totalIn = (s.total_input||0) + (s.total_cache_read||0) + (s.total_cache_creation||0);
+  const hitRate = totalIn > 0 ? (s.total_cache_read||0) / totalIn * 100 : 0;
+  document.getElementById('hk-cache').textContent = hitRate > 0 ? fmtPct(hitRate) : '—';
+  document.getElementById('hk-cache-sub').textContent =
+    d.cache_saved > 0 ? '$' + Number(d.cache_saved).toFixed(4) + ' saved vs no cache' : 'no cache hits yet';
+
+  document.getElementById('hk-reqs').textContent = fmt(s.total_requests);
+  const avgCostPerReq = (s.total_requests||0) > 0 ? (s.total_cost||0) / s.total_requests : 0;
+  document.getElementById('hk-reqs-sub').textContent =
+    avgCostPerReq > 0 ? '$' + avgCostPerReq.toFixed(4) + ' avg per request' : 'no requests yet';
+
+  // ── Action Plan + Health Grade
+  renderActionPlan(d.action_plan, d.health_grade);
+
+  // ── Task Breakdown
+  renderTaskBreakdown(d.task_breakdown);
+
+  // ── Trend chart
+  renderTrend(d.daily_trend || []);
+
+  // ── Cost breakdown (with hover tooltips)
+  const tip = document.getElementById('hm-tooltip');
+  const bdTotal = (bd.input||0)+(bd.output||0)+(bd.cache_read||0)+(bd.cache_creation||0) || 1;
+  const bdDescs = {
+    'bd-output': 'Output tokens — billed at 5× input rate. Main cost driver for long responses.',
+    'bd-cw':     'Cache write — 1.25× input rate. Paid once per session start; reused on reads.',
+    'bd-input':  'Input tokens — base rate. Actual non-cached context sent each request.',
+    'bd-cr':     'Cache read — 0.10× input rate. Tokens served from prompt cache (discounted).',
+  };
+  [
+    ['bd-output', bd.output,         'bd-output-pct', 'bd-output-bar'],
+    ['bd-cw',     bd.cache_creation, 'bd-cw-pct',     'bd-cw-bar'],
+    ['bd-input',  bd.input,          'bd-input-pct',  'bd-input-bar'],
+    ['bd-cr',     bd.cache_read,     'bd-cr-pct',     'bd-cr-bar'],
+  ].forEach(([id, val, pctId, barId]) => {
+    const el = document.getElementById(id);
+    el.textContent = fmtCost(val);
+    const pct = (val||0)/bdTotal*100;
+    document.getElementById(pctId).textContent = pctId === 'bd-cr-pct' ? '10% of input price' : fmtPct(pct) + ' of total';
+    document.getElementById(barId).style.width = pct.toFixed(1) + '%';
+    // Attach tooltip to the card
+    const card = el.closest('.bd-card');
+    if (card && bdDescs[id]) {
+      const tipTxt = `${fmtCost(val||0)}  ·  ${pct.toFixed(1)}% of total  ·  ${bdDescs[id]}`;
+      card.style.cursor = 'help';
+      card.addEventListener('mouseenter', () => { tip.textContent = tipTxt; tip.style.display = 'block'; });
+      card.addEventListener('mousemove',  e  => { tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-32)+'px'; });
+      card.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    }
+  });
+
+  // ── By source (with cache hit rate + hover tooltip)
+  const cacheByTool = {};
+  (d.cache_by_tool||[]).forEach(r => { cacheByTool[r.source] = r; });
+  const maxS = Math.max(...(d.by_source||[]).map(x=>x.total_cost||0), 0.00001);
+  const totalCostAll = (d.by_source||[]).reduce((s,x) => s+(x.total_cost||0), 0);
+  const srcEl = document.getElementById('by-source');
+  srcEl.innerHTML = (d.by_source||[]).length
+    ? d.by_source.map(x => {
+        const cr  = cacheByTool[x.source];
+        const pct = totalCostAll > 0 ? (x.total_cost/totalCostAll*100).toFixed(1) : '0';
+        const hitRateSuffix = cr ? ` · <span style="color:${cr.hit_rate>60?'var(--good)':cr.hit_rate>30?'var(--accent2)':'var(--muted)'}">${fmtPct(cr.hit_rate)} cache</span>` : '';
+        const tipTxt = `${x.source}  ·  ${fmtCost(x.total_cost)}  ·  ${pct}% of total  ·  ${x.reqs} requests${cr ? '  ·  cache hit '+cr.hit_rate+'%  ·  saved '+fmtCost(cr.saved) : ''}`;
+        return `
+          <div class="bar-row" style="cursor:crosshair"
+               data-tip="${tipTxt.replace(/"/g,'&quot;')}">
+            <div class="bar-meta">
+              <span class="bar-name">${sourceTag(x.source)}</span>
+              <span class="bar-vals"><span class="hi">${fmtCost(x.total_cost)}</span> · ${x.reqs} req${hitRateSuffix}</span>
+            </div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(x.total_cost/maxS*100).toFixed(1)}%"></div></div>
+          </div>`;
+      }).join('')
+    : '<div class="c-muted" style="font-size:12px;font-family:var(--mono)">No data</div>';
+  // attach tooltip to source rows
+  srcEl.querySelectorAll('[data-tip]').forEach(el => {
+    const t = el.dataset.tip;
+    el.addEventListener('mouseenter', () => { tip.textContent = t; tip.style.display = 'block'; });
+    el.addEventListener('mousemove',  e  => { tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-32)+'px'; });
+    el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  });
+
+  // ── By model (table)
+  const byModelTbody = document.getElementById('by-model-tbody');
+  if (byModelTbody) {
+    const modelRows = d.by_model || [];
+    byModelTbody.innerHTML = modelRows.length
+      ? modelRows.map(x => {
+          const cacheClr = x.cache_hit_rate >= 70 ? 'var(--good)' : x.cache_hit_rate >= 40 ? 'var(--accent2)' : 'var(--muted)';
+          const shortName = x.model.replace('claude-','').replace(/-20\d{6}$/,'');
+          const oneShotCell = x.one_shot_pct != null
+            ? `<span style="color:${x.one_shot_pct>=70?'var(--good)':x.one_shot_pct>=40?'var(--accent2)':'var(--muted)'}">${x.one_shot_pct}%</span>`
+            : '—';
+          return `<tr>
+            <td style="font-family:var(--mono);font-size:12px">${shortName}</td>
+            <td class="c-ok">${fmtCost(x.cost)}</td>
+            <td style="color:${cacheClr};font-family:var(--mono);font-size:12px">${x.cache_hit_rate != null ? x.cache_hit_rate + '%' : '—'}</td>
+            <td class="c-muted">${fmt(x.reqs)}</td>
+            <td>${oneShotCell}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="5" class="empty">No data</td></tr>`;
+  }
+
+  // ── Tool breakdown split (Core Tools + MCP Servers)
+  const tbs = d.tool_breakdown_split || {};
+  const coreTools = tbs.core || [];
+  const mcpTools  = tbs.mcp  || [];
+
+  const coreCard = document.getElementById('core-tools-card');
+  const mcpCard  = document.getElementById('mcp-servers-card');
+  const combCard = document.getElementById('tools-card-combined');
+
+  const renderBars = (containerId, items, maxVal, totalCount, colorGrad, extraLabel) => {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = items.map(x => {
+      const pct = totalCount > 0 ? (x.count / totalCount * 100).toFixed(1) : '0';
+      const tipTxt = `${x.name}  ·  ${fmt(x.count)} calls  ·  ${pct}% of all tool calls`;
+      return `<div class="bar-row" style="cursor:crosshair" data-tip="${tipTxt.replace(/"/g,'&quot;')}">
+        <div class="bar-meta">
+          <span class="bar-name" ${extraLabel ? `style="${extraLabel}"` : ''}>${x.name}</span>
+          <span class="bar-vals"><span class="hi">${fmt(x.count)}</span>${totalCount ? ` <span style="color:var(--muted);font-size:10px">${pct}%</span>` : ''}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(x.count/maxVal*100).toFixed(1)}%;${colorGrad?'background:'+colorGrad:''}"></div></div>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('[data-tip]').forEach(row => {
+      const t = row.dataset.tip;
+      row.addEventListener('mouseenter', () => { tip.textContent = t; tip.style.display = 'block'; });
+      row.addEventListener('mousemove',  e  => { tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-32)+'px'; });
+      row.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+    });
+  };
+
+  if (coreCard) {
+    coreCard.style.display = coreTools.length ? '' : 'none';
+    if (coreTools.length) {
+      const maxC  = Math.max(...coreTools.map(x => x.count), 1);
+      const totC  = coreTools.reduce((s,x) => s+x.count, 0);
+      renderBars('core-tools', coreTools, maxC, totC, null, null);
+    }
+  }
+
+  if (mcpCard) {
+    mcpCard.style.display = mcpTools.length ? '' : 'none';
+    if (mcpTools.length) {
+      const maxMCP = Math.max(...mcpTools.map(x => x.count), 1);
+      const totMCP = mcpTools.reduce((s,x) => s+x.count, 0);
+      renderBars('mcp-servers', mcpTools, maxMCP, totMCP,
+        'linear-gradient(90deg,#7c3aed,#a78bfa)', 'color:#7c3aed');
+    }
+  }
+  if (combCard) combCard.style.display = (coreTools.length || mcpTools.length) ? '' : 'none';
+
+  // ── Effort breakdown
+  const efData = d.effort_breakdown || [];
+  const efCard = document.getElementById('effort-card');
+  if (efData.length) {
+    efCard.style.display = 'block';
+    const efBadge = e => {
+      const map = {standard:'ef-standard',low:'ef-low',medium:'ef-medium',high:'ef-high',xhigh:'ef-xhigh'};
+      return `<span class="ef ${map[e]||'ef-standard'}">${e||'standard'}</span>`;
+    };
+    const efTot = efData.reduce((a,r) => ({reqs: a.reqs+(r.reqs||0), cost: a.cost+(r.cost||0)}), {reqs:0,cost:0});
+    document.getElementById('effort-tbody').innerHTML = efData.map(r => `
+      <tr>
+        <td style="font-family:var(--mono);font-size:11px">${r.model}</td>
+        <td>${efBadge(r.effort)}</td>
+        <td>${r.reqs}</td>
+        <td style="font-family:var(--mono);color:var(--warn)">$${Number(r.cost).toFixed(4)}</td>
+        <td style="font-family:var(--mono);color:var(--muted)">$${Number(r.avg_cost).toFixed(5)}</td>
+        <td style="font-family:var(--mono);color:var(--muted)">${Math.round(r.avg_out||0)}</td>
+      </tr>`).join('') + `
+      <tr class="tfoot-total">
+        <td colspan="2">TOTAL</td>
+        <td>${efTot.reqs}</td>
+        <td style="font-family:var(--mono);color:var(--warn)">$${efTot.cost.toFixed(4)}</td>
+        <td>—</td>
+        <td>—</td>
+      </tr>`;
+  } else {
+    efCard.style.display = 'none';
+  }
+
+  // ── Annual heatmap
+  if (d.heatmap && d.heatmap.length !== hmDataLen) { hmDataLen = d.heatmap.length; hmBuilt = false; }
+  if (!hmBuilt && d.heatmap) buildHeatmap(d.heatmap);
+
+  // ── Hourly heatmap
+  buildHourlyHeatmap(d.hourly_heatmap);
+
+  // ── Sessions
+  if (d.sessions) { _sessions = d.sessions; }
+  renderSessPage();
+
+  // ── Top requests
+  const avgReqCost = (s.total_cost||0) / Math.max(s.total_requests||1, 1);
+  const topRows = d.top_requests || [];
+  const topTot = topRows.reduce((a,r) => ({
+    inp: a.inp+(r.input_tokens||0), cr: a.cr+(r.cache_read_tokens||0),
+    out: a.out+(r.output_tokens||0), tools: a.tools+(r.tool_call_count||0),
+    cost: a.cost+(r.cost_usd||0), dur: a.dur+(r.duration_ms||0)
+  }), {inp:0,cr:0,out:0,tools:0,cost:0,dur:0});
+  const numTd = (val, cls='c-muted') => `<td style="text-align:right" class="${cls}">${val}</td>`;
+  document.getElementById('top-body').innerHTML = topRows.length
+    ? topRows.map(r => `
+        <tr>
+          <td class="c-muted" style="white-space:nowrap">${fmtDate(r.ts)}</td>
+          <td>${sourceTag(r.source)}</td>
+          <td class="c-muted" style="white-space:nowrap">${r.model.replace('claude-','').replace(/-20\d{6}$/,'')}</td>
+          ${numTd(fmt(r.input_tokens))}
+          ${numTd(fmt(r.cache_read_tokens||0),'c-good')}
+          ${numTd(fmt(r.output_tokens))}
+          ${numTd(r.tool_call_count||0)}
+          <td>${stopBadge(r.stop_reason)}</td>
+          ${numTd(fmtCost5(r.cost_usd), r.cost_usd >= avgReqCost*3 ? 'c-hi' : 'c-ok')}
+          ${numTd(fmtExecTime(r.duration_ms))}
+        </tr>`).join('') + `
+        <tr class="tfoot-total">
+          <td colspan="3">TOTAL (${topRows.length} rows)</td>
+          ${numTd(fmt(topTot.inp))}
+          ${numTd(fmt(topTot.cr),'c-good')}
+          ${numTd(fmt(topTot.out))}
+          ${numTd(topTot.tools)}
+          <td>—</td>
+          ${numTd(fmtCost(topTot.cost),'c-ok')}
+          ${numTd(fmtExecTime(topTot.dur))}
+        </tr>`
+    : `<tr><td colspan="10" class="empty">No data</td></tr>`;
+
+  // ── Recent requests
+  const tbody = document.getElementById('recent-body');
+  const empty = document.getElementById('empty-msg');
+  if (!(d.recent||[]).length) {
+    tbody.innerHTML = ''; empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    const recRows = d.recent;
+    const recTot = recRows.reduce((a,r) => ({
+      inp: a.inp+(r.input_tokens||0), cr: a.cr+(r.cache_read_tokens||0),
+      out: a.out+(r.output_tokens||0), tools: a.tools+(r.tool_call_count||0),
+      cost: a.cost+(r.cost_usd||0), dur: a.dur+(r.duration_ms||0)
+    }), {inp:0,cr:0,out:0,tools:0,cost:0,dur:0});
+    tbody.innerHTML = recRows.map(r => `
+      <tr>
+        <td class="c-muted" style="white-space:nowrap">${fmtTime(r.ts)}</td>
+        <td>${sourceTag(r.source)}</td>
+        <td class="c-muted" style="white-space:nowrap">${r.model.replace('claude-','').replace(/-20\d{6}$/,'')}</td>
+        ${numTd(fmt(r.input_tokens))}
+        ${numTd(fmt(r.cache_read_tokens||0),'c-good')}
+        ${numTd(fmt(r.output_tokens))}
+        ${numTd(r.tool_call_count||0)}
+        <td>${stopBadge(r.stop_reason)}</td>
+        ${numTd(fmtCost5(r.cost_usd),'c-hi')}
+        ${numTd(fmtExecTime(r.duration_ms))}
+        <td style="text-align:center" class="${r.status===200?'c-ok':'c-hi'}">${r.status===200?'✓':r.status}</td>
+      </tr>`).join('') + `
+      <tr class="tfoot-total">
+        <td colspan="3">TOTAL (${recRows.length} rows)</td>
+        ${numTd(fmt(recTot.inp))}
+        ${numTd(fmt(recTot.cr),'c-good')}
+        ${numTd(fmt(recTot.out))}
+        ${numTd(recTot.tools)}
+        <td>—</td>
+        ${numTd(fmtCost(recTot.cost),'c-ok')}
+        ${numTd(fmtExecTime(recTot.dur))}
+        <td>—</td>
+      </tr>`;
+  }
+
+  document.getElementById('refresh-note').textContent =
+    `${d.period} · live proxy updated ${new Date().toLocaleTimeString()} · every 3s`;
+
+  // Sync status (log import daemon)
+  try {
+    const ss = await fetch('/sync-status').then(r => r.json());
+    const syncEl = document.getElementById('sync-note');
+    if (ss.last_import_ts) {
+      const ago = Math.round((Date.now() - new Date(ss.last_import_ts).getTime()) / 1000);
+      const agoFmt = ago < 60 ? `${ago}s ago` : ago < 3600 ? `${Math.round(ago/60)}m ago` : `${Math.round(ago/3600)}h ago`;
+      syncEl.innerHTML = `log sync: <span style="color:var(--good)">✓ ${agoFmt}</span> · <span style="color:var(--muted);cursor:pointer;text-decoration:underline" onclick="syncNow()">sync now</span>`;
+    } else {
+      syncEl.textContent = 'log sync: not run yet';
+    }
+  } catch(e) {}
+}
+
+async function syncNow() {
+  const el = document.getElementById('sync-note');
+  el.textContent = 'log sync: syncing…';
+  try {
+    const r = await fetch('/sync-now', {method:'POST'}).then(r => r.json());
+    el.innerHTML = r.output
+      ? `log sync: <span style="color:var(--good)">✓ done</span> · ${r.output}`
+      : `log sync: <span style="color:var(--good)">✓ done (no new data)</span>`;
+    setTimeout(() => refresh(), 1000);
+  } catch(e) {
+    el.textContent = 'log sync: error';
+  }
+}
+
+// ── Projects (from JSONL logs) ────────────────────────────────────────────────
+async function refreshProjects() {
+  let p;
+  try { p = await fetch(`/projects?period=${period}`).then(r => r.json()); }
+  catch(e) { return; }
+
+  // ── By Project
+  const projTbody = document.getElementById('by-project-tbody');
+  const byProj = p.by_project || [];
+  const maxProjCost = Math.max(...byProj.map(x => x.cost), 0.0001);
+  if (projTbody) {
+    projTbody.innerHTML = byProj.length
+      ? byProj.map(x => {
+          const barW = Math.round(x.cost / maxProjCost * 60);
+          const short = x.path.split('/').slice(-2).join('/');
+          return `<tr>
+            <td style="font-family:var(--mono);font-size:12px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="width:${barW}px;height:6px;background:linear-gradient(90deg,#2563eb,#16a34a);border-radius:3px;flex-shrink:0"></div>
+                <span title="${x.path}">${short}</span>
+              </div>
+            </td>
+            <td class="c-ok" style="font-family:var(--mono)">${fmtCost(x.cost)}</td>
+            <td class="c-muted" style="font-family:var(--mono);font-size:11px">${fmtCost(x.avg_per_session)}</td>
+            <td class="c-muted">${x.sessions}</td>
+            <td class="c-muted">${x.calls}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="5" class="empty">No JSONL data found</td></tr>`;
+  }
+
+  // ── Top Sessions
+  const sessTbody = document.getElementById('top-sessions-tbody');
+  const topSess = p.top_sessions || [];
+  if (sessTbody) {
+    sessTbody.innerHTML = topSess.length
+      ? topSess.map(s => {
+          const short = s.path.split('/').slice(-2).join('/');
+          return `<tr>
+            <td class="c-muted" style="font-family:var(--mono);font-size:11px;white-space:nowrap">${s.date}</td>
+            <td style="font-family:var(--mono);font-size:12px" title="${s.path}">${short}</td>
+            <td class="c-hi">${fmtCost(s.cost)}</td>
+            <td class="c-muted">${s.calls}</td>
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="4" class="empty">No sessions</td></tr>`;
+  }
+
+  // ── Shell Commands
+  const shellCmds = p.shell_commands || [];
+  const shellCard = document.getElementById('shell-cmds-card');
+  if (shellCard) {
+    shellCard.style.display = shellCmds.length ? '' : 'none';
+    if (shellCmds.length) {
+      const maxSC = Math.max(...shellCmds.map(x => x.count), 1);
+      document.getElementById('shell-cmds').innerHTML = shellCmds.map(x => `
+        <div class="bar-row">
+          <div class="bar-meta">
+            <span class="bar-name">${x.name}</span>
+            <span class="bar-vals"><span class="hi">${fmt(x.count)}</span></span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${(x.count/maxSC*100).toFixed(1)}%;background:linear-gradient(90deg,#ea580c,#fb923c)"></div>
+          </div>
+        </div>`).join('');
+    }
+  }
+}
+
+refresh();
+refreshProjects();
+setInterval(refresh, 3000);
+setInterval(refreshProjects, 30000);
+
+// ── Version check ─────────────────────────────────────────────────────────────
+let _updateCmd = '';
+
+async function checkVersion() {
+  const btn = document.getElementById('check-version-btn');
+  if (btn) { btn.textContent = '↻ Checking…'; btn.disabled = true; }
+  try {
+    const resp = await fetch('/version');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const v = await resp.json();
+    _updateCmd = v.update_cmd || '';
+    const badge = document.getElementById('version-badge');
+    if (badge) {
+      badge.textContent = 'v' + (v.current || '?');
+      badge.style.color = v.up_to_date ? '#6b7280' : '#ea580c';
+      badge.style.fontWeight = v.up_to_date ? '600' : '700';
+    }
+    if (btn) {
+      if (v.up_to_date) {
+        btn.innerHTML = '<span style="font-size:13px">✓</span> Up to date';
+        btn.style.background = '#f0fdf4';
+        btn.style.borderColor = '#86efac';
+        btn.style.color = '#16a34a';
+      } else {
+        btn.innerHTML = '<span style="font-size:13px">⬆</span> Update available';
+        btn.style.background = '#fff7ed';
+        btn.style.borderColor = '#ea580c';
+        btn.style.color = '#ea580c';
+        btn.onclick = showUpdateModal;
+      }
+      btn.disabled = false;
+    }
+    const banner = document.getElementById('update-banner');
+    if (banner) {
+      if (!v.up_to_date && v.latest) {
+        document.getElementById('banner-versions').textContent =
+          'v' + v.current + ' → v' + v.latest;
+        banner.style.display = 'flex';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+  } catch(e) {
+    console.error('Version check failed:', e);
+    const badge = document.getElementById('version-badge');
+    if (badge) badge.textContent = 'v?';
+    if (btn) {
+      btn.innerHTML = '<span style="font-size:13px">↻</span> Check version';
+      btn.disabled = false;
+    }
+  }
+}
+
+function showUpdateModal() {
+  document.getElementById('update-cmd-box').textContent = _updateCmd;
+  document.getElementById('update-modal').style.display = 'flex';
+}
+
+function copyUpdateCmd() {
+  navigator.clipboard.writeText(_updateCmd);
+  const btn = document.getElementById('copy-btn');
+  btn.textContent = '✓ Copied!';
+  setTimeout(() => btn.textContent = 'Copy command', 2000);
+}
+
+checkVersion();
+setInterval(checkVersion, 86400000); // re-check every 24h
+
+// ── RAW Logs tab ──────────────────────────────────────────────────────────────
+let _rawLogs    = [];
+let _tierFilter = 'all';
+let _rawTimer   = null;
+
+function modelTier(model) {
+  const m = (model || '').toLowerCase();
+  if (m.includes('haiku'))  return 'haiku';
+  if (m.includes('sonnet')) return 'sonnet';
+  if (m.includes('opus'))   return 'opus';
+  return 'other';
+}
+
+function modelClass(model) {
+  return 'm-' + modelTier(model);
+}
+
+function shortModel(model) {
+  return (model || '').replace('claude-','').replace(/-20\d{6}$/,'');
+}
+
+function setTierFilter(btn) {
+  _tierFilter = btn.dataset.tier;
+  document.querySelectorAll('.rl-filter-btn[data-tier]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRawLogs();
+}
+
+function effortCell(effort, autoThinking) {
+  const e = (effort || 'standard').toLowerCase();
+  const autoTag = autoThinking ? ' <span class="effort-auto">⚡auto</span>' : '';
+  if (e === 'standard') return autoTag || '<span class="effort-std">standard</span>';
+  if (e === 'low')   return `<span class="effort-low">🧠 low</span>${autoTag}`;
+  if (e === 'medium')return `<span class="effort-med">🧠 med</span>${autoTag}`;
+  if (e === 'high')  return `<span class="effort-high">🧠 high</span>${autoTag}`;
+  if (e === 'xhigh') return `<span class="effort-xhigh">🧠 xhigh</span>${autoTag}`;
+  return `<span style="font-size:10px;color:var(--muted)">${e}</span>${autoTag}`;
+}
+
+function renderRawLogs() {
+  const q     = (document.getElementById('rl-search').value || '').toLowerCase();
+  const tbody = document.getElementById('rl-tbody');
+  const targetId = _rlTargetId;
+  const rows  = _rawLogs.filter(r => {
+    if (_tierFilter !== 'all' && modelTier(r.model) !== _tierFilter) return false;
+    if (q) {
+      const actLabel = (TASK_META[classifyTools(r.tools)] || {}).label || '';
+      const haystack = ((r.prompt_preview || '') + ' ' + (r.model || '') + ' ' + (r.source || '') + ' ' + actLabel).toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('rl-count').textContent = rows.length + ' / ' + _rawLogs.length + ' requests';
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="14" class="empty">No data</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const preview = (r.prompt_preview || '').trim();
+    const shortPrev = preview.length > 120 ? preview.slice(0, 120) + '…' : preview;
+    const promptHtml = preview
+      ? `<div class="prompt-cell" onclick="this.classList.toggle('expanded')">
+           <div class="prompt-short">${escHtml(shortPrev)}</div>
+           <div class="prompt-full">${escHtml(preview)}</div>
+         </div>`
+      : `<span style="color:#d1d5db;font-family:var(--mono);font-size:11px">—</span>`;
+
+    const actCat  = classifyTools(r.tools);
+    const actMeta = TASK_META[actCat] || {label: actCat, color: '#9ca3af', icon: '?'};
+    const actCell = `<span style="font-size:11px;white-space:nowrap;color:${actMeta.color}">${actMeta.icon} ${actMeta.label}</span>`;
+
+    const isTarget = targetId && r.id == targetId;
+    const rowLink  = `#raw?id=${r.id}`;
+
+    return `<tr id="rl-row-${r.id}"${isTarget ? ' class="rl-highlight"' : ''}>
+      <td style="text-align:right;color:var(--muted);font-size:11px"><a href="${rowLink}" onclick="setRlTarget(${r.id},event)" style="color:inherit;text-decoration:none" title="Permalink">${r.id}</a></td>
+      <td class="c-muted" style="white-space:nowrap;font-size:12px">${fmtDate(r.ts)}</td>
+      <td>${sourceTag(r.source)}</td>
+      <td class="${modelClass(r.model)}" style="font-family:var(--mono);font-size:12px;white-space:nowrap">${shortModel(r.model)}</td>
+      <td style="text-align:right" class="c-muted">${fmt(r.input_tokens)}</td>
+      <td style="text-align:right" class="c-good">${r.cache_read_tokens ? fmt(r.cache_read_tokens) : '—'}</td>
+      <td style="text-align:right" class="c-muted">${fmt(r.output_tokens)}</td>
+      <td style="text-align:right" class="c-muted">${r.tool_call_count || '—'}</td>
+      <td>${actCell}</td>
+      <td>${stopBadge(r.stop_reason)}</td>
+      <td style="text-align:right" class="${r.cost_usd > 0.01 ? 'c-hi' : 'c-ok'}">${fmtCost5(r.cost_usd)}</td>
+      <td style="text-align:right" class="c-muted">${fmtExecTime(r.duration_ms)}</td>
+      <td>${effortCell(r.effort, r.auto_thinking)}</td>
+      <td>${promptHtml}</td>
+    </tr>`;
+  }).join('');
+
+  // Scroll to highlighted row if navigating via URL
+  if (targetId) {
+    const el = document.getElementById(`rl-row-${targetId}`);
+    if (el) setTimeout(() => el.scrollIntoView({block:'center', behavior:'smooth'}), 80);
+  }
+}
+
+let _rlTargetId = null;
+
+function setRlTarget(id, e) {
+  e.preventDefault();
+  _rlTargetId = id;
+  history.replaceState(null, '', `#raw?id=${id}`);
+  renderRawLogs();
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateCompactBanner(logs) {
+  const banner = document.getElementById('compact-banner');
+  const bannerText = document.getElementById('compact-banner-text');
+  if (!logs || !logs.length) { banner.style.display = 'none'; return; }
+
+  // Find max input_tokens among last 10 requests from VS Code source
+  const recent = logs.slice(0, 10).filter(r => r.source === 'vscode');
+  if (!recent.length) { banner.style.display = 'none'; return; }
+
+  const maxIn = Math.max(...recent.map(r => r.input_tokens || 0));
+  const WARN  = 50000;
+  const CRIT  = 100000;
+
+  if (maxIn >= CRIT) {
+    bannerText.textContent = `⛔ Context critically large: ${(maxIn/1000).toFixed(0)}k input tokens in recent requests.`;
+    banner.style.background = '#fee2e2';
+    banner.style.borderColor = '#ef4444';
+    banner.style.color = '#7f1d1d';
+    banner.style.display = 'flex';
+  } else if (maxIn >= WARN) {
+    bannerText.textContent = `Context growing: ${(maxIn/1000).toFixed(0)}k input tokens in recent requests.`;
+    banner.style.background = '#fef3c7';
+    banner.style.borderColor = '#f59e0b';
+    banner.style.color = '#92400e';
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+async function refreshRawLogs() {
+  try {
+    _rawLogs = await fetch('/raw-logs?limit=500').then(r => r.json());
+    updateCompactBanner(_rawLogs);
+    renderRawLogs();
+    document.getElementById('rl-refresh-note').textContent =
+      'updated ' + new Date().toLocaleTimeString() + ' · 500 recent requests · click prompt to expand';
+  } catch(e) {
+    document.getElementById('rl-refresh-note').textContent = 'load error';
+  }
+}
+
+// ── Optimizer View ─────────────────────────────────────────────────────────
+let _optTimer = null;
+
+const OPT_COLORS = {
+  routing:  '#0ea5e9',
+  cache:    '#16a34a',
+  thinking: '#7c3aed',
+  trim:     '#f59e0b',
+  session:  '#ea580c',
+  dedup:    '#64748b',
+};
+
+const OPT_LEGEND = [
+  {
+    type: 'cache',
+    label: '♻ Prompt Cache',
+    color: '#16a34a',
+    desc: `<b>What is prompt caching and why does it save so much?</b><br><br>
+Claude Code sends a huge system prompt (~80–120k tokens) in EVERY request — tool instructions, file context, safety rules, etc. <b>Without caching</b> you'd pay $3 per 1M tokens every time — for every single request. Today that would be ~$161 just for the system prompt.<br><br>
+<b>How caching works:</b> Anthropic remembers tokens tagged with <code>cache_control</code> for 5 minutes. Re-reading costs $0.30 per 1M (10× cheaper). Our proxy automatically adds this tag to large prompts.<br><br>
+<b>Today's result:</b> paid $16 instead of $161 — saved $145.`,
+    metric: 'savings = cache_read_tokens × 0.9 × input_price/M',
+    note: 'Savings exist BECAUSE Claude Code sends a large system prompt. Without our tool (raw API) you wouldn\'t send those tokens at all — but the CLI wouldn\'t work either.',
+    status: 'active',
+  },
+  {
+    type: 'routing',
+    label: '⚡ Smart Routing',
+    color: '#0ea5e9',
+    desc: `<b>Why switch models?</b><br><br>
+Sonnet costs 5× more than Haiku. Most intermediate requests from Claude Code (safety checks, tool chains, simple questions) don't need Sonnet's power. The proxy scores request complexity (0–10) by length, keywords, and code presence and switches the model.<br><br>
+<b>Rules:</b> score ≤ 2 → Sonnet/Opus replaced with Haiku (5–25× cheaper). Score 3–5 + Opus → Sonnet. Score ≥ 6 → keep original.`,
+    metric: 'savings = cost(original_model) − cost(routed_model)',
+    note: 'Current data: 565 requests switched today, $16.64 saved.',
+    status: 'active',
+  },
+  {
+    type: 'thinking',
+    label: '🧠 Thinking Budget',
+    color: '#7c3aed',
+    desc: 'Limits budget_tokens for extended thinking if not set explicitly. Complexity 0–3 → 2k, 4–6 → 5k tokens. Prevents spending 10–30k thinking tokens on simple questions.',
+    metric: 'savings ≈ $0.02/req (conservative)',
+    status: 'active',
+  },
+  {
+    type: 'auto_think',
+    label: '🧠 Auto-Thinking',
+    color: '#9333ea',
+    desc: 'Automatically enables thinking when tool_result contains error/traceback/failed. Claude thinks deeper during debugging. ⚡auto badge in RAW Logs.',
+    metric: 'qualitative: better debugging without manual intervention',
+    status: 'active',
+  },
+  {
+    type: 'trim',
+    label: '✂ Trim Messages',
+    color: '#f59e0b',
+    desc: 'Removes old messages when total tokens exceed 50 000. Keeps last 3 + all tool_use/tool_result blocks. Prevents input tokens from growing unboundedly in long sessions.',
+    metric: 'savings = removed_tokens × input_price',
+    status: 'active',
+  },
+  {
+    type: 'session',
+    label: '📦 Session Cap',
+    color: '#ea580c',
+    desc: 'Per-session limit: trims history to 30 messages when exceeding 40. Detects new sessions by a sharp drop in message_count. Complements trim_old_messages on the client side.',
+    metric: 'savings ≈ removed_msgs × 200tok × price',
+    status: 'active',
+  },
+];
+
+function renderOptimizerLegend(activeTypes) {
+  const el = document.getElementById('opt-legend');
+  el.innerHTML = OPT_LEGEND.map(item => {
+    const isActive = !activeTypes || activeTypes.size === 0 || activeTypes.has(item.type);
+    const opacity = isActive ? '1' : '0.55';
+    const noteHtml = item.note
+      ? `<div style="font-size:10px;color:#6b7280;background:#f9fafb;border-left:3px solid ${item.color}40;padding:5px 8px;margin-top:7px;line-height:1.4">ℹ ${item.note}</div>`
+      : '';
+    return `<div style="opacity:${opacity};border:1px solid ${item.color}35;border-radius:8px;padding:12px 14px;background:#fff;transition:opacity .15s">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:700;color:${item.color}">${item.label}</span>
+        <span style="font-family:var(--mono);font-size:9px;background:${item.color}18;color:${item.color};border-radius:3px;padding:1px 5px;text-transform:uppercase;letter-spacing:.5px">${item.status}</span>
+      </div>
+      <div style="font-size:11.5px;color:#1f2937;line-height:1.55;margin-bottom:8px">${item.desc}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:#374151;background:#f0fdf4;border-radius:4px;padding:4px 8px;border:1px solid #bbf7d0">📐 ${item.metric}</div>
+      ${noteHtml}
+    </div>`;
+  }).join('');
+}
+
+function optTypeLabel(type) {
+  const item = OPT_LEGEND.find(x => x.type === type);
+  return item ? item.label : type;
+}
+
+function renderOptimizerKpis(mainStats, period) {
+  const cacheSaved = mainStats?.cache_saved ?? 0;
+  const haikuSaved = mainStats?.haiku_savings?.savings ?? 0;
+  const totalSaved = cacheSaved + haikuSaved;
+  const spent      = mainStats?.summary?.total_cost ?? 0;
+  const wouldHave  = spent + totalSaved;
+  const roi        = wouldHave > 0 ? (totalSaved / wouldHave * 100) : 0;
+
+  // Fix: monthly = (saved / period_days) * 30
+  const periodDays = {'today': 1, '7d': 7, '30d': 30, 'all': 30}[period] ?? 7;
+  const savedPerDay = totalSaved / periodDays;
+  const monthly     = savedPerDay * 30;
+
+  const el = id => document.getElementById(id);
+  el('opt-saved').textContent   = totalSaved > 0 ? '$' + totalSaved.toFixed(2) : '—';
+  el('opt-spent').textContent   = spent > 0 ? '$' + spent.toFixed(2) : '—';
+  el('opt-would-have').textContent = wouldHave > 0 ? '$' + wouldHave.toFixed(2) : '?';
+  el('opt-roi').textContent     = roi > 0 ? roi.toFixed(1) + '%' : '—';
+  el('opt-monthly').textContent = monthly > 0 ? '$' + monthly.toFixed(0) : '—';
+  el('opt-monthly-basis').textContent = `$${savedPerDay.toFixed(2)}/day × 30 (${periodDays}d period)`;
+
+  // Detailed breakdown for TOTAL SAVED
+  const parts = [];
+  if (cacheSaved > 0) parts.push(`♻ cache $${cacheSaved.toFixed(2)}`);
+  if (haikuSaved > 0) parts.push(`⚡ routing $${haikuSaved.toFixed(2)}`);
+  const detailEl = el('opt-saved-detail');
+  if (detailEl) {
+    detailEl.innerHTML = parts.length
+      ? parts.join(' + ') + '<br><span style="color:#6b7280">= difference between what you paid and what it would be without caching</span>'
+      : 'no data for this period';
+  }
+}
+
+function renderOptimizerTypes(mainStats) {
+  const tbody   = document.getElementById('opt-type-tbody');
+  const barchart= document.getElementById('opt-bar-chart');
+
+  const cacheSaved = mainStats?.cache_saved ?? 0;
+  const haikuSaved = mainStats?.haiku_savings?.savings ?? 0;
+  const haikuCount = mainStats?.haiku_savings?.requests ?? 0;
+
+  const types = {};
+  if (cacheSaved > 0) types['cache']   = {count: 0,          saved: cacheSaved};
+  if (haikuSaved > 0) types['routing'] = {count: haikuCount, saved: haikuSaved};
+
+  const total  = Object.values(types).reduce((s, v) => s + (v.saved||0), 0);
+  const sorted = Object.entries(types).sort((a, b) => (b[1].saved||0) - (a[1].saved||0));
+
+  if (!sorted.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="padding:16px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted)">No data for this period</td></tr>`;
+    barchart.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = sorted.map(([type, info]) => {
+    const pct   = total > 0 ? ((info.saved||0) / total * 100) : 0;
+    const color = OPT_COLORS[type] || '#9ca3af';
+    const cnt   = info.count > 0 ? info.count.toLocaleString() : '—';
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 18px;font-family:var(--mono);font-size:11px;font-weight:600;color:${color}">${optTypeLabel(type)}</td>
+      <td style="padding:8px 12px;text-align:right;font-family:var(--mono);font-size:12px;color:#16a34a;font-weight:700">$${(info.saved||0).toFixed(2)}</td>
+      <td style="padding:8px 12px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">${cnt}</td>
+      <td style="padding:8px 18px 8px 8px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">${pct.toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+
+  // Bar chart
+  const spent = mainStats?.summary?.total_cost ?? 0;
+  const items = [
+    {label: 'Actual Cost (paid)', value: spent, color: '#ef4444'},
+    ...sorted.map(([type, info]) => ({label: optTypeLabel(type), value: info.saved||0, color: OPT_COLORS[type]||'#9ca3af'}))
+  ].filter(x => x.value > 0);
+
+  const maxVal = Math.max(...items.map(x => x.value), 0.001);
+  barchart.innerHTML = items.map(item => `
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:140px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.label}</div>
+      <div style="flex:1;display:flex;align-items:center;gap:6px">
+        <div style="height:16px;border-radius:3px;background:${item.color};opacity:0.8;min-width:4px;width:${Math.max(1, (item.value/maxVal)*100)}%"></div>
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${item.color};white-space:nowrap">$${item.value.toFixed(2)}</span>
+      </div>
+    </div>`).join('');
+}
+
+function renderOptimizerRouting(mainStats) {
+  const tbody    = document.getElementById('opt-routing-tbody');
+  const countEl  = document.getElementById('opt-routing-count');
+  const reqs     = mainStats?.haiku_savings?.requests ?? 0;
+  const saved    = mainStats?.haiku_savings?.savings ?? 0;
+  const actual   = mainStats?.haiku_savings?.actual ?? 0;
+  const equiv    = mainStats?.haiku_savings?.haiku_equivalent ?? 0;
+  const avgIn    = mainStats?.haiku_savings?.avg_input_tokens ?? 0;
+  const avgOut   = mainStats?.haiku_savings?.avg_output_tokens ?? 0;
+  const efforts  = mainStats?.haiku_savings?.effort_counts ?? {};
+
+  countEl.textContent = reqs > 0 ? `${reqs.toLocaleString()} requests · $${saved.toFixed(2)} saved` : '';
+
+  if (!reqs) {
+    tbody.innerHTML = `<tr><td colspan="9" style="padding:14px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted)">No routing for this period (smart routing disabled or period=today with low traffic)</td></tr>`;
+    return;
+  }
+
+  const costPerReq = reqs > 0 ? equiv / reqs : 0;
+  const origPerReq = reqs > 0 ? actual / reqs : 0;
+
+  // Build effort breakdown string: standard 9000 · low 1200 · thinking 30
+  const effortParts = [];
+  const effortOrder = ['standard', 'low', 'medium', 'high', 'xhigh'];
+  for (const e of effortOrder) {
+    if (efforts[e]) effortParts.push(`${e} ${efforts[e].toLocaleString()}`);
+  }
+  // thinking = auto_thinking or xhigh
+  const effortStr = effortParts.length ? effortParts.join(' · ') : '—';
+
+  tbody.innerHTML = `
+    <tr style="background:#f0fdf4">
+      <td colspan="2" style="padding:10px 18px;font-family:var(--mono);font-size:11px;color:var(--muted)">Aggregated data for period</td>
+      <td style="padding:10px 12px;font-family:var(--mono);font-size:11px;color:#374151">Sonnet / Opus</td>
+      <td style="padding:10px 12px;font-family:var(--mono);font-size:11px;color:#16a34a;font-weight:600">→ Haiku</td>
+      <td style="padding:10px 12px;text-align:right;font-family:var(--mono);font-size:11px;color:#374151">${avgIn > 0 ? fmt(avgIn) : '—'}</td>
+      <td style="padding:10px 12px;text-align:right;font-family:var(--mono);font-size:11px;color:#374151">${avgOut > 0 ? fmt(avgOut) : '—'}</td>
+      <td style="padding:10px 12px;text-align:right;font-family:var(--mono);font-size:10px;color:var(--muted);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${effortStr}">${effortStr}</td>
+      <td style="padding:10px 12px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--hi);font-weight:600">$${actual.toFixed(2)}</td>
+      <td style="padding:10px 18px 10px 12px;text-align:right;font-family:var(--mono);font-size:12px;color:#16a34a;font-weight:700">$${saved.toFixed(2)}</td>
+    </tr>
+    <tr style="background:#f8fafc">
+      <td colspan="7" style="padding:8px 18px;font-family:var(--mono);font-size:10px;color:var(--muted)">
+        ${reqs.toLocaleString()} requests · avg $${origPerReq.toFixed(4)} original → $${costPerReq.toFixed(4)} routed · savings ${saved > 0 ? ((saved/(saved+equiv))*100).toFixed(0) : 0}% per request
+      </td>
+      <td colspan="2" style="padding:8px 18px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right">
+        aggregated for period
+      </td>
+    </tr>`;
+}
+
+function renderOptimizerDaily(mainStats, period) {
+  const chart = document.getElementById('opt-daily-chart');
+  const axis  = document.getElementById('opt-daily-axis');
+
+  // Build daily from daily_trend + haiku_savings ratio
+  const daily = mainStats?.daily_trend ?? [];
+  const cacheSaved = mainStats?.cache_saved ?? 0;
+  const haikuSaved = mainStats?.haiku_savings?.savings ?? 0;
+  const totalSaved = cacheSaved + haikuSaved;
+  const totalCost  = mainStats?.summary?.total_cost ?? 0;
+
+  if (!daily.length || period === 'today') {
+    chart.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Daily trend available for 7d / 30d periods</span>';
+    axis.innerHTML = '';
+    return;
+  }
+
+  // Estimate saved per day proportional to cost
+  const totalCostFromTrend = daily.reduce((s, d) => s + (d.cost||0), 0);
+  const bars = daily.map(d => {
+    const dayCost = d.cost || 0;
+    const daySaved = totalCostFromTrend > 0 ? (dayCost / totalCostFromTrend) * totalSaved : 0;
+    const h = totalSaved > 0 ? Math.max(4, Math.round((daySaved / (totalSaved / daily.length * 2)) * 72)) : 4;
+    const label = d.date ? d.date.slice(5) : '';
+    return `<div title="${label}: ~$${daySaved.toFixed(2)} saved" style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default">
+      <div style="font-family:var(--mono);font-size:8px;color:#16a34a;opacity:0.8">${daySaved >= 0.5 ? '$'+daySaved.toFixed(0) : ''}</div>
+      <div style="width:22px;height:${Math.min(h,72)}px;background:#16a34a;border-radius:2px 2px 0 0;opacity:0.75"></div>
+    </div>`;
+  });
+  chart.innerHTML = bars.join('');
+  axis.innerHTML  = daily.map(d => `<span style="width:26px;text-align:center;display:inline-block;font-family:var(--mono);font-size:9px;color:var(--muted)">${(d.date||'').slice(5)}</span>`).join('');
+}
+
+async function refreshOptimizer() {
+  try {
+    const mainStats = await fetch(`/stats?period=${period}`).then(r => r.json());
+
+    renderOptimizerKpis(mainStats, period);
+    renderOptimizerTypes(mainStats);
+    renderOptimizerRouting(mainStats);
+    renderOptimizerDaily(mainStats, period);
+
+    // Legend: mark which types fired this period
+    const activeTypes = new Set();
+    if ((mainStats?.cache_saved ?? 0) > 0)              activeTypes.add('cache');
+    if ((mainStats?.haiku_savings?.savings ?? 0) > 0)   activeTypes.add('routing');
+    renderOptimizerLegend(activeTypes);
+
+    document.getElementById('opt-refresh-note').textContent =
+      'updated ' + new Date().toLocaleTimeString() + ' · data from /stats';
+  } catch(e) {
+    document.getElementById('opt-refresh-note').textContent = 'load error';
+  }
+}
+
+function showOptimizer() {
+  document.querySelector('main').style.display = 'none';
+  document.getElementById('raw-logs-view').style.display = 'none';
+  document.getElementById('optimizer-view').style.display = 'block';
+  document.getElementById('nav-optimizer').classList.add('nav-active');
+  document.getElementById('nav-raw').classList.remove('nav-active');
+  refreshOptimizer();
+  if (_optTimer) clearInterval(_optTimer);
+  _optTimer = setInterval(refreshOptimizer, 10000);
+}
+
+let _rawAutoRefreshEnabled = true;  // default ON
+
+function toggleAutoRefresh() {
+  _rawAutoRefreshEnabled = !_rawAutoRefreshEnabled;
+  const btn = document.getElementById('rl-refresh-toggle');
+
+  if (_rawAutoRefreshEnabled) {
+    btn.textContent = '↺ Refresh ON';
+    btn.classList.remove('inactive');
+    btn.classList.add('active');
+    // Start auto-refresh immediately when toggling ON
+    if (_rawTimer) clearInterval(_rawTimer);
+    _rawTimer = setInterval(refreshRawLogs, 5000);
+  } else {
+    btn.textContent = '↺ Refresh OFF';
+    btn.classList.remove('active');
+    btn.classList.add('inactive');
+    // Stop auto-refresh
+    if (_rawTimer) clearInterval(_rawTimer);
+    _rawTimer = null;
+  }
+}
+
+function showRaw(targetId) {
+  document.querySelector('main').style.display = 'none';
+  document.getElementById('raw-logs-view').style.display = 'block';
+  document.getElementById('optimizer-view').style.display = 'none';
+  document.getElementById('nav-raw').classList.add('nav-active');
+  document.getElementById('nav-optimizer').classList.remove('nav-active');
+  _rlTargetId = targetId || null;
+  if (_optTimer) { clearInterval(_optTimer); _optTimer = null; }
+  refreshRawLogs();
+  // Start auto-refresh only if enabled
+  if (_rawTimer) clearInterval(_rawTimer);
+  if (_rawAutoRefreshEnabled) {
+    _rawTimer = setInterval(refreshRawLogs, 5000);
+  }
+}
+
+function showMain() {
+  document.querySelector('main').style.display = '';
+  document.getElementById('raw-logs-view').style.display = 'none';
+  document.getElementById('optimizer-view').style.display = 'none';
+  document.getElementById('nav-raw').classList.remove('nav-active');
+  document.getElementById('nav-optimizer').classList.remove('nav-active');
+  if (_rawTimer) { clearInterval(_rawTimer); _rawTimer = null; }
+  if (_optTimer) { clearInterval(_optTimer); _optTimer = null; }
+}
+
+// ── Hash-based routing for direct links ──────────────────────────────────────
+function parseRlHash() {
+  const h = location.hash; // e.g. "#raw?id=1400897" or "#raw"
+  if (!h.startsWith('#raw')) return null;
+  const m = h.match(/[?&]id=(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+window.addEventListener('load', () => {
+  if (location.hash.startsWith('#raw')) {
+    showRaw(parseRlHash());
+  } else if (location.hash.startsWith('#optimizer')) {
+    showOptimizer();
+  }
+});
+
+window.addEventListener('hashchange', () => {
+  if (location.hash.startsWith('#raw')) {
+    const id = parseRlHash();
+    _rlTargetId = id;
+    if (document.getElementById('raw-logs-view').style.display === 'none') {
+      showRaw(id);
+    } else {
+      renderRawLogs();
+    }
+  } else if (location.hash.startsWith('#optimizer')) {
+    if (document.getElementById('optimizer-view').style.display === 'none') {
+      showOptimizer();
+    }
+  } else if (location.hash === '' || location.hash === '#') {
+    showMain();
+  }
+});
+</script>
+</body>
+</html>

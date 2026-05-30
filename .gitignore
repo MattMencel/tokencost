@@ -1,0 +1,30 @@
+# Databases
+tracker.db
+tracker.db.empty
+requests.db
+
+# Logs
+*.log
+proxy.log
+proxy-error.log
+sync.log
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# macOS
+.DS_Store
+menubar/.build/
+
+# IDE / Personal settings
+.claude/settings.local.json
+.smart_routing
+.vscode/launch.json
+.claude/settings.json
+.aider.*
