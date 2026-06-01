@@ -490,6 +490,59 @@ def _open_sqlite_ro(path: Path):
 
 
 
+# ── Provider: GitHub Copilot (usage tracking, no pricing) ────────────────────
+
+def import_copilot(conn):
+    """GitHub Copilot: parse log lines for usage tracking (model + time, no token counts)."""
+    log_path = Path(HOME) / "Library/Application Support/Code/logs"
+    if not log_path.exists():
+        return 0, 0, 0
+
+    inserted = errors = 0
+    # Find all GitHub Copilot Chat log files
+    for log_file in log_path.glob("*/window*/exthost/GitHub.copilot-chat/GitHub Copilot Chat.log"):
+        try:
+            with open(log_file, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    # Format: "2026-06-01 10:08:47.566 [info] ccreq:53102d5e.copilotmd | success | gpt-5-mini -> gpt-5-mini-2025-08-07 | 7408ms | [panel/editAgent]"
+                    if "ccreq:" not in line or "| success |" not in line:
+                        continue
+                    try:
+                        parts = line.split("|")
+                        if len(parts) < 3:
+                            continue
+                        # Extract timestamp
+                        ts_str = line.split("[info]")[0].strip()
+                        ts = ts_str if ts_str else None
+                        # Extract request ID
+                        req_id = line.split("ccreq:")[1].split(".")[0] if "ccreq:" in line else ""
+                        # Extract model (may have arrow like "gpt-5-mini -> gpt-5-mini-2025-08-07")
+                        model_part = parts[2].strip() if len(parts) > 2 else ""
+                        model = model_part.split("->")[-1].strip() if model_part else "copilot-unknown"
+                        # Extract duration
+                        dur_str = parts[3].strip() if len(parts) > 3 else "0ms"
+                        duration_ms = int(dur_str.replace("ms", "")) if "ms" in dur_str else 0
+
+                        if not ts or not req_id:
+                            continue
+
+                        msg_uuid = f"copilot:{req_id}"
+                        # Insert with cost_usd = 0 (no pricing data available)
+                        inserted += _insert(
+                            conn, ts=ts or "1970-01-01T00:00:00Z",
+                            source="copilot", model=model,
+                            input_tok=0, output_tok=0,
+                            cache_read=0, cache_write=0,
+                            stop_reason="", tools=[], tool_count=0,
+                            msg_uuid=msg_uuid, cost_override=0.0,
+                            prompt_preview=f"[Copilot {model}]"
+                        )
+                    except Exception:
+                        errors += 1
+        except (OSError, PermissionError):
+            errors += 1
+    return inserted, 0, errors
+
 
 # ── Fuzzy backfill: fill prompt_preview for proxy records from JSONL ──────────
 
@@ -670,6 +723,10 @@ def import_all(verbose: bool = True) -> dict:
     # 7. IBM Bob (same JSON format as Cline)
     ins, skip, err = import_ibm_bob(conn)
     results["IBM Bob"] = (ins, skip, err)
+
+    # 8. GitHub Copilot (usage tracking only, no pricing)
+    ins, skip, err = import_copilot(conn)
+    results["Copilot"] = (ins, skip, err)
 
     # Backfill prompt_preview for proxy-captured records by matching JSONL files
     backfilled = _backfill_previews_from_jsonl(conn)

@@ -29,7 +29,7 @@ Full spend analytics at `http://localhost:8082/dashboard`:
 - **Cost by day / week / month** — trend chart with daily breakdown
 - **By task type** — Coding vs Shell vs Agent vs Planning vs Web
 - **By model** — Claude Haiku / Sonnet / Opus / GPT-4o / etc.
-- **By source** — Claude Code, Claude Desktop, VS Code Extensions (Cline, Roo Code, Kilo Code, IBM Bob), OpenClaw, API providers
+- **By source** — Claude Code, Claude Desktop, VS Code Extensions, OpenClaw, GitHub Copilot (usage only), API providers
 - **Cache analytics** — hit rate, money saved vs. what you'd pay without caching
 - **Session view** — every conversation: tokens in/out, cost, tools used
 - **RAW Logs** — last 500 requests with full prompt preview
@@ -113,7 +113,16 @@ open ~/Applications/TokenCostBar.app
 
 ---
 
-## Supported Providers
+## Supported Sources
+
+### Local applications (auto-tracked from logs, synced every 5 minutes)
+- **Claude Code / Claude CLI** — from `~/.claude/projects/**/*.jsonl`
+- **Claude Desktop** — from `~/Library/.../local-agent-mode-sessions/**/*.jsonl`
+- **OpenClaw** — from `~/.openclaw/agents/**/*.jsonl`
+- **VS Code Extensions** (Cline, Roo Code, Kilo Code, IBM Bob) — from `VSCode/workspaceStorage/*/tasks/ui_messages.json`
+- **GitHub Copilot** — usage tracking from VS Code logs (model + requests, pricing unavailable)
+
+### API Providers (real-time via proxy — set base URL)
 
 Set the base URL for each provider you want to track:
 

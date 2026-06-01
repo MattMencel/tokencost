@@ -40,7 +40,7 @@ http://localhost:8082/dashboard
 - **How to Reduce Costs** — action plan with concrete savings ($X/mo) and health grade (A–F)
 - **By Activity** — breakdown by task type (Code/Bash/Agent/Web/Plan/Search) with columns: turns, 1-shot%, avg input, cost
 - **Spend Trend** — cost chart by day
-- **By Source** — who's spending (Claude Code, Claude Desktop, VS Code Extensions, OpenClaw, API providers) with inline cache hit rate
+- **By Source** — who's spending (Claude Code, Claude Desktop, VS Code Extensions, OpenClaw, GitHub Copilot usage, API providers) with inline cache hit rate
 - **By Model** — table: model, cost, cache%, calls, 1-shot%
 - **Core Tools** — most used Claude tools (Edit, Bash, Read...)
 - **MCP Servers** — external MCP servers and call counts
