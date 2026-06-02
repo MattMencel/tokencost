@@ -1,3 +1,6 @@
+# Local runtime cache (contains absolute paths)
+.version_cache.json
+
 # Databases
 tracker.db
 tracker.db.empty
