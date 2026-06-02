@@ -708,14 +708,14 @@ def _cache_by_tool(period):
     clause = _period_clause(period)
     con = sqlite3.connect(DB_PATH)
     rows = con.execute(f"""
-        SELECT source, model,
+        SELECT REPLACE(source,'-history','') as source, model,
                COUNT(*) as reqs,
                SUM(input_tokens) as inp,
                SUM(cache_read_tokens) as cr,
                SUM(cache_creation_tokens) as cw,
                ROUND(SUM(cost_usd), 5) as cost
         FROM requests WHERE 1=1 {clause}
-        GROUP BY source, model
+        GROUP BY REPLACE(source,'-history',''), model
     """).fetchall()
     con.close()
     tools: dict = {}
@@ -1421,12 +1421,14 @@ def get_stats(period="7d"):
     """).fetchone())
 
     by_source = [dict(r) for r in con.execute(f"""
-        SELECT source, COUNT(*) as reqs,
+        SELECT
+               REPLACE(source, '-history', '') as source,
+               COUNT(*) as reqs,
                ROUND(SUM(cost_usd),4) as total_cost,
                ROUND(AVG(cost_usd),5) as avg_cost,
                ROUND(AVG(input_tokens + output_tokens + cache_read_tokens)) as avg_tokens
         FROM requests WHERE 1=1 {clause}
-        GROUP BY source ORDER BY total_cost DESC
+        GROUP BY REPLACE(source, '-history', '') ORDER BY total_cost DESC
     """).fetchall()]
 
     by_model = [dict(r) for r in con.execute(f"""
@@ -1523,7 +1525,7 @@ def weekly_digest():
         "SELECT ROUND(SUM(cost_usd),2) as cost FROM requests WHERE ts >= datetime('now','-14 days') AND ts < datetime('now','-7 days')"
     ).fetchone())
     top  = con.execute(
-        "SELECT source, ROUND(SUM(cost_usd),2) as cost FROM requests WHERE ts >= datetime('now','-7 days') GROUP BY source ORDER BY cost DESC LIMIT 1"
+        "SELECT REPLACE(source,'-history','') as source, ROUND(SUM(cost_usd),2) as cost FROM requests WHERE ts >= datetime('now','-7 days') GROUP BY REPLACE(source,'-history','') ORDER BY cost DESC LIMIT 1"
     ).fetchone()
     con.close()
     cost      = cur["cost"]  or 0.0
