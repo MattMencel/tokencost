@@ -1,3 +1,19 @@
+# v1.0.4 — Windows setup script hardening
+
+- **ASCII-only `onbording.ps1`**: Unicode box-drawing/em-dash characters in the
+  script were misread as smart-quote string delimiters when PowerShell read the
+  file without a BOM, breaking parsing. Script is now pure ASCII.
+- **No-admin autostart fallback**: `Register-ScheduledTask` needs elevation; when
+  it's denied, setup now installs a hidden Startup-folder launcher (`TokenCost.vbs`)
+  so the proxy still autostarts at logon without admin
+- **Clean stop**: Disable/restart now kills the full uvicorn supervisor+worker pair
+  (by port *and* command line), leaving no orphaned `proxy.py` process
+
+Verified end-to-end on Windows 11: full Start flow (Python check -> deps -> import
+-> env var -> autostart fallback -> proxy start -> dashboard) runs from the script.
+
+---
+
 # v1.0.3 — Windows support
 
 Full Windows 10/11 port alongside the existing macOS build.

@@ -1,17 +1,20 @@
 <#
-  TokenCost — Windows setup / start / stop script
+  TokenCost - Windows setup / start / stop script
   PowerShell equivalent of onbording.sh (macOS).
 
   Run:   powershell -ExecutionPolicy Bypass -File onbording.ps1
   or:    double-click tokencost.bat
 
+  NOTE: This file is intentionally pure ASCII. PowerShell can misread non-ASCII
+  bytes (em-dashes, box-drawing chars) as smart-quote string delimiters when the
+  file has no UTF-8 BOM, which breaks parsing. Keep it ASCII-only.
+
   What it does (Start):
     1. Creates a Python venv and installs fastapi / uvicorn / httpx
     2. Imports your local Claude / VS Code history into tracker.db
     3. Sets ANTHROPIC_BASE_URL=http://localhost:8082 as a User env var
-       (picked up by Claude Code, VS Code, Claude Desktop, new terminals)
-    4. Registers a scheduled task so the proxy autostarts at logon, plus a
-       5-minute log-sync task (best effort — skipped if not permitted)
+    4. Registers a scheduled task (or a Startup-folder launcher if not elevated)
+       so the proxy autostarts at logon, plus a 5-minute log-sync task
     5. Starts the proxy in the background and opens the dashboard
 #>
 
@@ -27,8 +30,9 @@ $ProxyLog   = Join-Path $ScriptDir "proxy.log"
 $ProxyErr   = Join-Path $ScriptDir "proxy-error.log"
 $TaskProxy  = "TokenCostProxy"
 $TaskSync   = "TokenCostSync"
+$StartupVbs = Join-Path ([Environment]::GetFolderPath('Startup')) "TokenCost.vbs"
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# --- Helpers ------------------------------------------------------------------
 function Write-Step($n, $msg) { Write-Host "  [$n] $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)       { Write-Host "  [ok] $msg"  -ForegroundColor Green }
 function Write-Warn2($msg)    { Write-Host "  [!]  $msg"  -ForegroundColor Yellow }
@@ -42,9 +46,15 @@ function Get-ProxyPids {
 function Test-ProxyRunning { return (@(Get-ProxyPids).Count -gt 0) }
 
 function Stop-Proxy {
+    # Kill the uvicorn supervisor+worker pair by port AND by command line,
+    # so no orphaned proxy.py process is left behind.
     foreach ($procId in (Get-ProxyPids)) {
         try { Stop-Process -Id $procId -Force -ErrorAction Stop } catch {}
     }
+    $self = $ScriptDir.Replace('\', '\\')
+    Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -match 'proxy\.py' -and $_.CommandLine -match $self } |
+        ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }
     Start-Sleep -Milliseconds 800
 }
 
@@ -57,7 +67,8 @@ function Find-Python {
         $exe = $cand.Split(" ")[0]
         if (Get-Command $exe -ErrorAction SilentlyContinue) {
             try {
-                $v = & $exe ($cand.Split(" ")[1..10]) --version 2>&1
+                $rest = @($cand.Split(" ")[1..10] | Where-Object { $_ })
+                $v = & $exe @rest --version 2>&1
                 if ($LASTEXITCODE -eq 0) { return $cand }
             } catch {}
         }
@@ -65,7 +76,7 @@ function Find-Python {
     return $null
 }
 
-# ── Scheduled tasks (best effort, no admin required for current user) ──────────
+# --- Autostart: scheduled tasks (need elevation) ------------------------------
 function Register-Tasks {
     try {
         $action = New-ScheduledTaskAction -Execute $VenvPy `
@@ -95,7 +106,23 @@ function Unregister-Tasks {
     }
 }
 
-# ── Start the proxy in the background ─────────────────────────────────────────
+# --- Autostart fallback: hidden launcher in the Startup folder (no admin) ------
+function Set-StartupLauncher {
+    $tpl = @'
+' TokenCost - start proxy hidden at logon (no console window)
+Set sh = CreateObject("WScript.Shell")
+sh.CurrentDirectory = "__DIR__"
+sh.Run "cmd /c """"__PY__"" -B ""__DIR__\proxy.py"" >> ""__LOG__"" 2>&1""", 0, False
+'@
+    $vbs = $tpl.Replace('__DIR__', $ScriptDir).Replace('__PY__', $VenvPy).Replace('__LOG__', $ProxyLog)
+    Set-Content -Path $StartupVbs -Value $vbs -Encoding ASCII
+}
+
+function Remove-StartupLauncher {
+    if (Test-Path $StartupVbs) { Remove-Item $StartupVbs -Force -ErrorAction SilentlyContinue }
+}
+
+# --- Start the proxy in the background -----------------------------------------
 function Start-ProxyBackground {
     if (Test-SmartRoutingOn) { $env:SMART_ROUTING = "1" } else { $env:SMART_ROUTING = "0" }
     Start-Process -FilePath $VenvPy `
@@ -106,11 +133,11 @@ function Start-ProxyBackground {
         -WindowStyle Hidden | Out-Null
 }
 
-# ── Action: Start ─────────────────────────────────────────────────────────────
+# --- Action: Start -------------------------------------------------------------
 function Action-Start {
     Clear-Host
     Write-Host ""
-    Write-Host "  TokenCost — Windows Setup" -ForegroundColor White
+    Write-Host "  TokenCost - Windows Setup" -ForegroundColor White
     Write-Host ""
 
     # Smart routing prompt
@@ -162,11 +189,17 @@ function Action-Start {
     $env:ANTHROPIC_BASE_URL = $BaseUrl
     Write-Ok "ANTHROPIC_BASE_URL = $BaseUrl"
 
-    # 5. Scheduled tasks (autostart + 5-min sync)
+    # 5. Autostart + sync
     Write-Host ""
-    Write-Step "5/7" "Registering autostart + sync tasks..."
-    if (Register-Tasks) { Write-Ok "Scheduled tasks registered (proxy autostart, sync every 5 min)" }
-    else { Write-Warn2 "Could not register scheduled tasks (non-critical — proxy still starts now)" }
+    Write-Step "5/7" "Registering autostart + sync..."
+    if (Register-Tasks) {
+        Remove-StartupLauncher   # avoid double autostart if a task already exists
+        Write-Ok "Scheduled tasks registered (proxy autostart, sync every 5 min)"
+    } else {
+        Set-StartupLauncher
+        Write-Ok "Proxy autostart added to Startup folder (no admin required)"
+        Write-Warn2 "Auto-sync needs admin - use the 'Sync now' button in the dashboard, or re-run as Administrator"
+    }
 
     # 6. Start proxy
     Write-Host ""
@@ -179,7 +212,7 @@ function Action-Start {
         if (Test-ProxyRunning) { $ready = $true; break }
     }
     if ($ready) { Write-Ok "Proxy running on $BaseUrl" }
-    else { Write-Warn2 "Proxy did not report ready — check proxy-error.log" }
+    else { Write-Warn2 "Proxy did not report ready - check proxy-error.log" }
 
     # 7. Open dashboard
     Write-Host ""
@@ -196,18 +229,19 @@ function Action-Start {
     Write-Host ""
 }
 
-# ── Action: Disable ───────────────────────────────────────────────────────────
+# --- Action: Disable -----------------------------------------------------------
 function Action-Disable {
     Clear-Host
     Write-Host ""
-    Write-Host "  TokenCost — Disable" -ForegroundColor White
+    Write-Host "  TokenCost - Disable" -ForegroundColor White
     Write-Host ""
 
     if (Test-ProxyRunning) { Stop-Proxy; Write-Ok "Proxy stopped" }
     else { Write-Host "  Proxy was not running" }
 
     Unregister-Tasks
-    Write-Ok "Removed scheduled tasks"
+    Remove-StartupLauncher
+    Write-Ok "Removed autostart (scheduled tasks + Startup launcher)"
 
     [Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", $null, "User")
     Remove-Item Env:\ANTHROPIC_BASE_URL -ErrorAction SilentlyContinue
@@ -220,7 +254,7 @@ function Action-Disable {
     Write-Host ""
 }
 
-# ── Menu ──────────────────────────────────────────────────────────────────────
+# --- Menu ----------------------------------------------------------------------
 Clear-Host
 Write-Host ""
 Write-Host "  ==============================" -ForegroundColor White
