@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import sys; sys.stdout.reconfigure(line_buffering=True)
+import sys
+# UTF-8 + line buffering: Windows consoles default to cp1252 and would crash
+# on the box-drawing / emoji characters this proxy logs.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
+    except Exception:
+        pass
 """
 TokenCost — proxy for Anthropic + OpenAI-compatible APIs
   ANTHROPIC_BASE_URL=http://localhost:8082          (Claude / Anthropic)
@@ -773,7 +780,7 @@ def projects(period: str = "7d"):
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
     return HTMLResponse(
-        content=open(_DASH).read(),
+        content=open(_DASH, encoding="utf-8").read(),
         headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
     )
 
@@ -1017,6 +1024,12 @@ def sync_now():
     }
 
 
+def _update_cmd() -> str:
+    if sys.platform == "win32":
+        return f'cd /d "{_DIR}" && git pull && powershell -ExecutionPolicy Bypass -File onbording.ps1'
+    return f"cd {_DIR} && git pull && bash onbording.sh"
+
+
 @app.get("/version")
 def version_info():
     import json as _json
@@ -1024,21 +1037,24 @@ def version_info():
     # prefer file cache written by import_history.py daemon (updated every 24h)
     if os.path.exists(_cache_file):
         try:
-            cached = _json.loads(open(_cache_file).read())
+            cached = _json.loads(open(_cache_file, encoding="utf-8").read())
             # refresh current version in case it changed on disk
             cached["current"] = _CURRENT_VERSION
             cached["up_to_date"] = cached.get("latest") == _CURRENT_VERSION
+            # update_cmd must reflect the current OS, not whatever wrote the cache
+            cached["update_cmd"] = _update_cmd()
             return cached
         except Exception:
             pass
     # fallback: fetch live (happens only before first daemon run)
     latest  = _fetch_latest_version()
     up2date = (latest is None) or (latest == _CURRENT_VERSION)
+    update_cmd = _update_cmd()
     return {
         "current":    _CURRENT_VERSION,
         "latest":     latest,
         "up_to_date": up2date,
-        "update_cmd": f"cd {_DIR} && git pull && bash onbording.sh",
+        "update_cmd": update_cmd,
     }
 
 @app.post("/api/update")

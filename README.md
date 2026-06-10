@@ -64,9 +64,9 @@ Smart Routing scores each prompt 0–10 (length, keywords, code presence) and si
 
 ## Install
 
-> ⚠️ **macOS only** — This tool requires macOS (Monterey 12+) and the launchd system. Linux and Windows are not currently supported.
+**Requirements:** Python 3.9+ · macOS (Monterey 12+) **or** Windows 10/11
 
-**Requirements:** Python 3.9+
+### macOS
 
 **Step 1 — first time only:**
 ```bash
@@ -91,6 +91,24 @@ The setup script:
 3. Sets `ANTHROPIC_BASE_URL=http://localhost:8082` in `~/.zshrc` and macOS launchd
 4. Adds `tokencost` alias for quick restarts
 5. Starts the proxy and opens the dashboard
+
+### Windows
+
+**Step 1 — first time only** (PowerShell):
+```powershell
+cd $HOME; git clone https://github.com/mr-beaver/tokencost; cd tokencost; powershell -ExecutionPolicy Bypass -File onbording.ps1
+```
+
+**Step 2 — every time after:** double-click **`tokencost.bat`** in the repo folder, or run the same `onbording.ps1` command again. Pick option **1** to start, **2** to disable.
+
+The Windows setup script (`onbording.ps1`):
+1. Creates a Python virtualenv and installs dependencies (`requirements.txt`)
+2. Imports your full Claude usage history from local logs (`%APPDATA%\Claude`, `%APPDATA%\Code`, `~/.claude`)
+3. Sets `ANTHROPIC_BASE_URL=http://localhost:8082` as a **User** environment variable (picked up by Claude Code, VS Code, Claude Desktop, and new terminals)
+4. Registers a scheduled task so the proxy autostarts at logon, plus a 5-minute log-sync task
+5. Starts the proxy and opens the dashboard
+
+> The macOS menu-bar widget is not available on Windows — use the web dashboard at `http://localhost:8082/dashboard`.
 
 **After install**, all your Claude Code and VS Code requests flow through the proxy automatically.
 
@@ -211,7 +229,10 @@ tokencost/
 ├── import_history.py  — Import historical logs from Claude CLI, Desktop, OpenClaw
 ├── projects.py        — Project/session tracking
 ├── dashboard.html     — Web dashboard UI
-├── onbording.sh       — Setup / start / stop script
+├── onbording.sh       — Setup / start / stop script (macOS)
+├── onbording.ps1      — Setup / start / stop script (Windows)
+├── tokencost.bat      — Windows launcher (double-click)
+├── requirements.txt   — Python dependencies
 └── menubar/           — macOS SwiftUI menu bar app
     ├── build.sh
     └── Sources/TokenCostBar/
