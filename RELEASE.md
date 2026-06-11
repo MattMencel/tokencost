@@ -1,3 +1,14 @@
+# v1.0.7 — Claude Fable 5 & Opus 4.8 support + routing dashboard
+
+- **New models**: Fable 5 ($10/$50M) and Opus 4.8 ($5/$25M) added to pricing and smart routing
+- **Fable 5 routing**: score 0–2 → Haiku (50× cheaper), score 3–5 → Sonnet (17× cheaper), score 6+ → keep original
+- **Routing dashboard**: Optimizer tab now shows each model switch individually (Fable→Haiku, Opus→Sonnet) with timestamps and savings — dynamic labels replace hardcoded "Sonnet / Opus"
+- **Fix**: routing events now saved to `optimizations_json` so savings are tracked correctly
+- **Fix Windows update command**: `import_history.py` now emits the same `powershell -Command "Set-Location..."` form as `proxy.py` — the previous `cd /d` was cmd.exe-only and broke in PowerShell (Windows 11 default)
+- **Menubar app**: retry logic on startup — waits up to 10s for proxy to boot; Sync Logs retries 3× before showing "error"
+
+---
+
 # v1.0.6 — Working self-update on Windows
 
 The dashboard's "Update" command now works on Windows:

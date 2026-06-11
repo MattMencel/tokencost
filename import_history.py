@@ -796,7 +796,8 @@ def check_version_and_cache():
             latest = r.read().decode().strip()
         _dir = Path(__file__).parent
         if sys.platform == "win32":
-            update_cmd = f'cd /d "{_dir}" && git pull && powershell -ExecutionPolicy Bypass -File onbording.ps1'
+            inner = f"Set-Location '{_dir}'; git pull; & '{_dir}\\onbording.ps1' -Update"
+            update_cmd = f'powershell -NoProfile -ExecutionPolicy Bypass -Command "{inner}"'
         else:
             update_cmd = f"cd {_dir} && git pull && bash onbording.sh"
         result = {
