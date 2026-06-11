@@ -762,7 +762,13 @@ def _haiku_savings(period):
         FROM requests WHERE 1=1 {clause} AND model NOT LIKE '%haiku%'
         GROUP BY effort
     """).fetchall()
+    routing_rows = con.execute(f"""
+        SELECT DISTINCT optimizations_json FROM requests
+        WHERE optimizations_json IS NOT NULL {clause}
+    """).fetchall()
     con.close()
+
+    import json as _json
     hp = HAIKU_PRICING
     total_actual = total_haiku = total_reqs = 0.0
     total_inp = total_out = 0.0
@@ -776,11 +782,27 @@ def _haiku_savings(period):
     effort_counts = {row[0]: row[1] for row in effort_rows}
     avg_input  = round(total_inp / total_reqs) if total_reqs > 0 else 0
     avg_output = round(total_out / total_reqs) if total_reqs > 0 else 0
+
+    # Extract unique original models from routing optimizations_json
+    seen = set()
+    original_models = []
+    for (opt_str,) in routing_rows:
+        try:
+            for opt in _json.loads(opt_str):
+                if opt.get("type") == "routing" and opt.get("from"):
+                    m = opt["from"].split("[")[0].strip()
+                    if m and m not in seen:
+                        seen.add(m)
+                        original_models.append(m)
+        except Exception:
+            pass
+
     return {
         "actual": round(total_actual, 4), "haiku_equivalent": round(total_haiku, 4),
         "savings": round(total_actual - total_haiku, 4), "requests": int(total_reqs),
         "avg_input_tokens": avg_input, "avg_output_tokens": avg_output,
         "effort_counts": effort_counts,
+        "original_models": original_models,
     }
 
 

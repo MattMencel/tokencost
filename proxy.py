@@ -636,6 +636,9 @@ async def proxy_anthropic(path: str, request: Request):
         if routed:
             body_data["model"] = routed
             print(f"  [routing] {orig_model} → {routed} (score={score})")
+            optimizations = [("routing", f"{orig_model} → {routed} (score={score})")]
+        else:
+            optimizations = []
         # strip effort/thinking/betas — effort causes 400 on current API version
         for key in ("effort", "thinking", "betas"):
             body_data.pop(key, None)
@@ -646,7 +649,8 @@ async def proxy_anthropic(path: str, request: Request):
                 body_data.pop("output_config")
 
         # ── Cost optimizations ─────────────────────────────────────────────────
-        body_data, optimizations = optimize_request(body_data)
+        body_data, cost_optimizations = optimize_request(body_data)
+        optimizations = optimizations + cost_optimizations
         auto_thinking = any(tag.strip() == "think" for tag, _ in optimizations)
         for tag, msg in optimizations:
             print(f"  [{tag:6}] {msg}")

@@ -225,10 +225,21 @@ class StatsModel: ObservableObject {
     private var timer: Timer?
 
     init() {
-        Task { await refreshAll() }
+        Task { await refreshWithRetry() }
         Task { await fetchVersion() }
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             Task { await self?.refreshAll() }
+        }
+    }
+
+    // On startup the proxy may still be booting — retry up to 5× with 2s backoff
+    private func refreshWithRetry() async {
+        for attempt in 0..<5 {
+            if attempt > 0 {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+            await refreshAll()
+            if proxyOK { return }
         }
     }
 
@@ -292,19 +303,28 @@ class StatsModel: ObservableObject {
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
             req.timeoutInterval = 60
-            do {
-                let (data, _) = try await URLSession.shared.data(for: req)
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    let out = json["output"] as? String ?? ""
-                    DispatchQueue.main.async {
-                        self.syncResult = out.isEmpty ? "✓ up to date" : out
-                    }
+            // Retry up to 3× in case the proxy is still booting
+            for attempt in 0..<3 {
+                if attempt > 0 {
+                    DispatchQueue.main.async { self.syncResult = "retrying…" }
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
                 }
-                await refreshAll()
-                await fetchSyncStatus()
-            } catch {
-                DispatchQueue.main.async { self.syncResult = "error" }
+                do {
+                    let (data, _) = try await URLSession.shared.data(for: req)
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        let out = json["output"] as? String ?? ""
+                        DispatchQueue.main.async {
+                            self.syncResult = out.isEmpty ? "✓ up to date" : out
+                        }
+                    }
+                    await refreshAll()
+                    await fetchSyncStatus()
+                    return
+                } catch {
+                    // continue to next attempt
+                }
             }
+            DispatchQueue.main.async { self.syncResult = "error" }
         }
     }
 

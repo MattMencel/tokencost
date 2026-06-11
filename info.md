@@ -265,13 +265,24 @@ Read from `.smart_routing` file — **no proxy restart needed** when toggling.
 
 | Score | Original model | Result | Savings |
 |-------|---------------|--------|---------|
-| 0–2   | Sonnet        | → **Haiku** | ~5× cheaper |
-| 0–2   | Opus          | → **Haiku** | ~25× cheaper |
-| 3–5   | Opus          | → **Sonnet** | ~5× cheaper |
-| 3–5   | Sonnet        | stays Sonnet | — |
+| 0–2   | Fable 5       | → **Haiku** | ~50× cheaper |
+| 0–2   | Opus 4.8      | → **Haiku** | ~25× cheaper |
+| 0–2   | Sonnet 4.6    | → **Haiku** | ~5× cheaper |
+| 3–5   | Fable 5       | → **Sonnet** | ~17× cheaper |
+| 3–5   | Opus 4.8      | → **Sonnet** | ~5× cheaper |
+| 3–5   | Sonnet 4.6    | stays Sonnet | — |
 | 6–10  | any           | stays original | — |
 
-**Note on prompt caching:** When a model is downrouted, the prompt cache is re-keyed to the target model, not the original. This means you lose potential cache reuse on the original model. However, for the simple requests that get downrouted (score ≤2), this cache tradeoff is negligible compared to the 5–25× cost savings. Complex requests that would benefit from cache reuse (score 6–10) are never downrouted.
+**Note on prompt caching:** When a model is downrouted, the prompt cache is re-keyed to the target model, not the original. This means you lose potential cache reuse on the original model. However, for the simple requests that get downrouted (score ≤2), this cache tradeoff is negligible compared to the 5–50× cost savings. Complex requests that would benefit from cache reuse (score 6–10) are never downrouted.
+
+### Dashboard Optimizer Tab
+
+The **Optimizer** tab on the dashboard shows real-time routing performance:
+
+- **Smart Routing log** — each model switch listed separately with timestamp, count, and savings
+- **Grouped by route** — Fable→Haiku, Opus→Sonnet, etc. all tracked individually
+- **Date filters** — Today / 7d / 30d periods
+- **Total savings** — aggregate of all routing + cache optimizations this period
 
 ### How Score Is Calculated (0–10)
 

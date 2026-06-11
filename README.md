@@ -165,12 +165,15 @@ When enabled (`onbording.sh → option 1`), the proxy scores the last user messa
 | 0–2 | Fable 5 | **Haiku** | ~50× cheaper |
 | 0–2 | Opus 4.8 | **Haiku** | ~25× cheaper |
 | 0–2 | Sonnet 4.6 | **Haiku** | ~5× cheaper |
-| 3–5 | Fable 5 / Opus | **Sonnet** | ~5–17× cheaper |
+| 3–5 | Fable 5 | **Sonnet** | ~17× cheaper |
+| 3–5 | Opus 4.8 | **Sonnet** | ~5× cheaper |
 | 6–10 | any | unchanged | — |
 
 Simple questions (`what is X`, `explain Y`), short messages, and tool-chain intermediates score 0–2. Long coding tasks with keywords like `implement`, `refactor`, `debug` score 6+.
 
-**Supported Claude models:** Fable 5, Opus 4.8, Sonnet 4.6, Haiku 4.5 (plus legacy 3.x versions).
+**Supported Claude models:** Fable 5 ($10/$50M), Opus 4.8 ($5/$25M), Sonnet 4.6 ($3/$15M), Haiku 4.5 ($1/$5M) — plus legacy 3.x versions.
+
+**Fable 5 specifics:** Fable is only downrouted for very simple requests (score ≤2). For complex tasks (score 3+), Fable is preserved to take advantage of its reasoning capabilities. This means expensive long-horizon tasks stay on Fable, but throwaway pings and quick questions automatically use Haiku.
 
 ---
 
