@@ -443,6 +443,11 @@ def route_model(body_bytes: bytes) -> tuple[str | None, str | None, int]:
     """
     Returns (original_model, routed_model, score).
     routed_model is None if no change needed or routing disabled.
+
+    Routing rules:
+    - Score 0-2: any model → Haiku (except Haiku stays Haiku)
+    - Score 3-5: Opus/Fable → Sonnet (Sonnet/Haiku unchanged)
+    - Score 6-10: no routing
     """
     if not _smart_routing_enabled():
         return None, None, 0
@@ -454,7 +459,7 @@ def route_model(body_bytes: bytes) -> tuple[str | None, str | None, int]:
     original = body.get("model", "")
     low = original.lower()
 
-    if not any(m in low for m in ("claude", "opus", "sonnet", "haiku")):
+    if not any(m in low for m in ("claude", "fable", "opus", "sonnet", "haiku")):
         return original, None, 0
     if "haiku" in low:
         return original, None, 0  # already cheapest
@@ -463,7 +468,7 @@ def route_model(body_bytes: bytes) -> tuple[str | None, str | None, int]:
 
     if score <= 2:
         return original, ROUTE_CHEAP, score
-    if score <= 5 and "opus" in low:
+    if score <= 5 and any(m in low for m in ("opus", "fable")):
         return original, ROUTE_MID, score
 
     return original, None, score

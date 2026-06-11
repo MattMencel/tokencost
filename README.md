@@ -28,7 +28,7 @@ Full spend analytics at `http://localhost:8082/dashboard`:
 
 - **Cost by day / week / month** — trend chart with daily breakdown
 - **By task type** — Coding vs Shell vs Agent vs Planning vs Web
-- **By model** — Claude Haiku / Sonnet / Opus / GPT-4o / etc.
+- **By model** — Claude Fable 5, Opus 4.8, Sonnet 4.6, Haiku 4.5, GPT-4o, etc. (218 models total)
 - **By source** — Claude Code, Claude Desktop, VS Code Extensions, OpenClaw, GitHub Copilot (usage only), API providers
 - **Cache analytics** — hit rate, money saved vs. what you'd pay without caching
 - **Session view** — every conversation: tokens in/out, cost, tools used
@@ -50,7 +50,7 @@ The proxy applies these silently on every request:
 | Optimization | What it does | Typical savings |
 |---|---|---|
 | **Prompt Cache** | Auto-tags large system prompts and user messages for caching | **60–90%** on repeat reads |
-| **Smart Routing** | Routes simple requests to Haiku instead of Sonnet/Opus | **5–25×** cheaper per request |
+| **Smart Routing** | Routes simple requests to cheaper models (Fable→Haiku, Opus→Sonnet, etc.) | **5–25×** cheaper per request |
 | **Thinking Budget** | Caps `budget_tokens` for extended thinking based on complexity | 80–90% on thinking tokens |
 | **Message Trim** | Removes old messages when context exceeds 50k tokens | Prevents runaway costs |
 | **Session Cap** | Limits history to 40 messages per session | Prevents VS Code "prompt too long" errors |
@@ -162,12 +162,15 @@ When enabled (`onbording.sh → option 1`), the proxy scores the last user messa
 
 | Score | Original model | Routes to | Savings |
 |---|---|---|---|
-| 0–2 | Sonnet | **Haiku** | ~5× cheaper |
-| 0–2 | Opus | **Haiku** | ~25× cheaper |
-| 3–5 | Opus | **Sonnet** | ~5× cheaper |
+| 0–2 | Fable 5 | **Haiku** | ~50× cheaper |
+| 0–2 | Opus 4.8 | **Haiku** | ~25× cheaper |
+| 0–2 | Sonnet 4.6 | **Haiku** | ~5× cheaper |
+| 3–5 | Fable 5 / Opus | **Sonnet** | ~5–17× cheaper |
 | 6–10 | any | unchanged | — |
 
 Simple questions (`what is X`, `explain Y`), short messages, and tool-chain intermediates score 0–2. Long coding tasks with keywords like `implement`, `refactor`, `debug` score 6+.
+
+**Supported Claude models:** Fable 5, Opus 4.8, Sonnet 4.6, Haiku 4.5 (plus legacy 3.x versions).
 
 ---
 
