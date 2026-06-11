@@ -277,6 +277,50 @@ tokencost/
 
 ---
 
+## How much can you save?
+
+Benchmarks below use **Opus 4.8 base pricing** with a typical vibe-coding session mix: 35% simple Q&A (score 0–2 → Haiku), 25% medium refactors (score 3–5 → Sonnet), 40% complex tasks (score 6–10 → Opus). System prompt ~3k tokens reused across the session, 15% duplicate requests filtered.
+
+### Savings from $10k/month
+
+| Optimization | Saves | Rate | How |
+|---|---|---|---|
+| **Prompt cache** | $1,200–1,800 | 12–18% | System prompt reads at 0.1× cost |
+| **Smart routing** | $1,600–2,400 | 16–24% | 60% of requests → Haiku/Sonnet |
+| **Thinking budget** | $300–600 | 3–6% | Caps `budget_tokens` by complexity |
+| **Dedup + trim** | $100–200 | 1–2% | 5s dedup window + 50k context trim |
+| **Total** | **$3,800–5,200** | **38–52%** | Combined effect |
+
+### Savings by spend level
+
+```
+ $30k ┤
+ $25k ┤                                                    ◉ Max savings
+ $20k ┤
+ $15k ┤
+ $10k ┤                                         ◉
+  $5k ┤                              ◉
+  $2k ┤               ◉
+  $0k ┼────────────────────────────────────────────────────
+       $1k           $5k          $10k        $20k        $50k
+                          Monthly spend
+```
+
+At **$10k/month**: saves ~$3,800–5,200 → **$45–62k/year**.  
+At **$50k/month**: saves ~$19k–26k.
+
+### Usage mix assumptions
+
+| Score | Routes to | Mix |
+|---|---|---|
+| 0–2 (explain, what is, short Q&A) | **Haiku** | 35% |
+| 3–5 (medium refactors, review) | **Sonnet** | 25% |
+| 6–10 (implement, debug, architect) | **Opus** | 40% |
+
+Results vary by usage pattern. Heavy Opus users with long system prompts see the largest gains — prompt cache + smart routing compound. Minimal savings if you already route manually or use Haiku exclusively.
+
+---
+
 ## License
 
 MIT
