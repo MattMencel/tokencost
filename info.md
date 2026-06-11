@@ -275,6 +275,16 @@ Read from `.smart_routing` file — **no proxy restart needed** when toggling.
 
 **Note on prompt caching:** When a model is downrouted, the prompt cache is re-keyed to the target model, not the original. This means you lose potential cache reuse on the original model. However, for the simple requests that get downrouted (score ≤2), this cache tradeoff is negligible compared to the 5–50× cost savings. Complex requests that would benefit from cache reuse (score 6–10) are never downrouted.
 
+### Does Switching Models Break the Cache?
+
+**Short answer: no, and routing is still a net win.**
+
+The cache key is based on the request content (system prompt + messages), not the model. When the proxy routes Opus → Haiku, the cheaper model still gets the 90% cache discount on previously cached tokens — you don't pay to re-cache everything.
+
+The actual concern is more subtle: different models have different input prices, so the absolute dollar value of the cache discount differs slightly between Opus and Haiku. But the base price of Haiku is so much lower to begin with that the combined savings (cheaper model × cache discount) are always greater than staying on the expensive model with cache alone.
+
+The only scenario where routing could hurt is routing *up* — sending a cheap model's request to an expensive one. The proxy never does this. Routing is strictly downward (Fable/Opus → Sonnet → Haiku) and only for requests scored 0–5. High-complexity requests that benefit most from caching (score 6–10) are always left on the original model.
+
 ### Dashboard Optimizer Tab
 
 The **Optimizer** tab on the dashboard shows real-time routing performance:

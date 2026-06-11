@@ -217,6 +217,8 @@ Simple questions (`what is X`, `explain Y`), short messages, and tool-chain inte
 
 **Fable 5 specifics:** Fable is only downrouted for very simple requests (score ≤2). For complex tasks (score 3+), Fable is preserved to take advantage of its reasoning capabilities. This means expensive long-horizon tasks stay on Fable, but throwaway pings and quick questions automatically use Haiku.
 
+**Does switching models break the cache?** No. The cache key is based on request content, not the model — so when the proxy routes Opus → Haiku, the cheaper model still gets the 90% cache discount. The only nuance: different models have different input prices, so the absolute dollar value of the discount varies. But Haiku's base price is so much lower that the combined savings (cheaper model + cache discount) always exceed staying on the original model with cache alone. High-complexity requests that benefit most from caching (score 6–10) are never routed away from the original model.
+
 ---
 
 ## Stats API
