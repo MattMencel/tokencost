@@ -90,16 +90,18 @@ def routing_skipped_count() -> int:
 
 
 def should_skip_routing(requested_model: str, target_model: str,
-                        now: float, body_bytes: bytes) -> bool:
+                        now: float, body_bytes: bytes, score: int = 0) -> bool:
     """
     Returns True if routing should be skipped to preserve the prompt cache.
 
-    Routing is ALLOWED only when:
+    Routing is ALLOWED when:
       1. No session state exists yet (first request — cache not written)
       2. Cache TTL has expired (> 5 min since last request to this session)
+      3. score >= 6 AND session is on Haiku — quality matters more than cache
+         (e.g. session started with a simple ping→Haiku, now a complex task arrives)
 
     Routing is BLOCKED when:
-      - Session is active (< 5 min gap) AND cache is warm for the current model
+      - Session is active (< 5 min gap) AND cache is warm AND score < 6
       - Switching model would bust a cache that costs ~$0.30 to rebuild
     """
     global _routing_skipped_cache
@@ -119,8 +121,12 @@ def should_skip_routing(requested_model: str, target_model: str,
     if gap > _CACHE_TTL_SEC:
         return False  # cache expired → allow routing
 
-    # Session is active. Block routing if cache was written for a different model
-    # (switching model now would bust the cache and force a re-write).
+    # Exception: complex request (score ≥ 6) when session is stuck on Haiku.
+    # Cache bust is acceptable — quality matters more than $0.30 cache savings.
+    if score >= 6 and "haiku" in state.get("model", "").lower():
+        return False
+
+    # Session is active. Block routing if cache was written for a different model.
     if state.get("cache_warm") and state.get("model") != target_model:
         _routing_skipped_cache += 1
         return True

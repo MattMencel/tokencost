@@ -1,3 +1,12 @@
+# v1.1.1 — Scoring and routing accuracy fixes
+
+- **Fix: "add a" false positive removed** from `_COMPLEX_KW` — "add a newline here" was scoring +3 and routing to Sonnet. Kept "add feature" and "add support" as legitimate complex signals
+- **Fix: file path signal strengthened** from +1 to +2 — `/src/auth/middleware.py` style references are real codebase questions that Haiku handles poorly without project context
+- **Fix: tool call depth now scales** — was flat +2 for any number of tool calls, now `min(count, 4)`. 1 tool call and 10 tool calls should not score the same
+- **Fix: Haiku upgrade path** — if session started on Haiku (e.g. first request was `ping`) and a complex request (score≥6) arrives later, routing is now allowed to upgrade the model. Previously `should_skip_routing` blocked all switches to preserve cache, trapping complex requests on Haiku. Cache bust is acceptable when task quality matters more than $0.30 cache savings. `score` is now passed into `should_skip_routing`
+
+---
+
 # v1.1.0 — Memory leak fix: LRU eviction on in-memory caches
 
 - **LRU eviction on `_session_state`**: capped at 1000 entries — oldest session evicted when limit reached. Previously grew unboundedly for the lifetime of the proxy process

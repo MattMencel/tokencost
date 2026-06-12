@@ -306,7 +306,6 @@ _COMPLEX_KW = {
     "review", "code review",
     "add feature",
     "add support",
-    "add a",
     "extend",
     "update",
     "modify",
@@ -356,9 +355,9 @@ def _code_pattern_score(text: str) -> int:
     # code constructs
     if _re.search(r"\b(def |class |function |const |let |var |async |await |import |export )", text):
         score += 2
-    # file paths  /src/foo  ./bar
+    # file paths  /src/foo  ./bar — codebase questions need more context than Haiku has
     if _re.search(r"[/\\]\w[\w/\\.-]{3,}", text):
-        score += 1
+        score += 2
     return min(score, 5)
 
 
@@ -396,10 +395,9 @@ def complexity_score(body: dict) -> int:
     score += _keyword_score(last_text)
     score += _code_pattern_score(last_text)
 
-    # Bump if actively in the middle of a tool chain (last 4 messages have tool calls)
+    # Bump by tool call depth — more tool turns = deeper task, needs more capable model
     recent = messages[-4:] if len(messages) >= 4 else messages
-    if _count_tool_turns(recent) > 0:
-        score += 2
+    score += min(_count_tool_turns(recent), 4)
 
     return min(score, 10)
 
@@ -664,7 +662,7 @@ async def proxy_anthropic(path: str, request: Request):
         body_data = json.loads(body_bytes)
         from optimizer import should_skip_routing
         if routed:
-            if should_skip_routing(orig_model, routed, now, body_bytes):
+            if should_skip_routing(orig_model, routed, now, body_bytes, score):
                 print(f"  [routing] skipped {orig_model} → {routed} (cache warm, score={score})")
                 routed = None
                 optimizations = []
