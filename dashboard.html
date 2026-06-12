@@ -876,6 +876,7 @@ style="display:contents"></div>
           <th style="padding:7px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Source</th>
           <th style="padding:7px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Original</th>
           <th style="padding:7px 12px;text-align:left;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Routed to</th>
+          <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Count</th>
           <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">In tok avg</th>
           <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Out tok avg</th>
           <th style="padding:7px 12px;text-align:right;font-size:11px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border)">Effort</th>
@@ -2436,7 +2437,8 @@ function renderOptimizerRouting(mainStats, optStats) {
       <td style="padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right">${g.count.toLocaleString()}×</td>
       <td style="padding:8px 12px;font-family:var(--mono);font-size:11px;font-weight:600;color:${fromColor}">${fromShort}</td>
       <td style="padding:8px 12px;font-family:var(--mono);font-size:11px;font-weight:600;color:${toColor}">→ ${toShort}</td>
-      <td colspan="3" style="padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--muted)">—</td>
+      <td style="padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right">${g.count.toLocaleString()}</td>
+      <td colspan="2" style="padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--muted)">—</td>
       <td style="padding:8px 12px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted)">—</td>
       <td style="padding:8px 18px 8px 12px;text-align:right;font-family:var(--mono);font-size:12px;color:#16a34a;font-weight:700">$${g.saved.toFixed(4)}</td>
     </tr>`;
