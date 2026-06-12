@@ -318,12 +318,7 @@ def optimize_request(body_data: dict) -> tuple:
     """
     optimizations = []
 
-    # 0b. Auto-enable thinking on tool errors (before budget limiting)
-    body_data, think_auto = auto_enable_thinking(body_data)
-    if think_auto:
-        optimizations.append(think_auto)
-
-    # 0c. Limit thinking budget if not already set
+    # Limit thinking budget if client already requested thinking
     body_data, thinking_opt = limit_thinking_budget(body_data)
     if thinking_opt:
         optimizations.append(thinking_opt)
