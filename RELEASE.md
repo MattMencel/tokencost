@@ -1,3 +1,12 @@
+# v1.1.0 — Memory leak fix: LRU eviction on in-memory caches
+
+- **LRU eviction on `_session_state`**: capped at 1000 entries — oldest session evicted when limit reached. Previously grew unboundedly for the lifetime of the proxy process
+- **LRU eviction on `_dedup_cache`**: capped at 500 entries. In practice dedup entries expire by TTL on access, but without a size cap a burst of unique requests could accumulate stale entries indefinitely
+
+In practice the leak was ~200 KB/month at normal usage — not critical, but now bounded.
+
+---
+
 # v1.0.9 — Cache-aware smart routing + optimizer improvements
 
 - **Cache-aware routing**: Smart Routing now detects active prompt cache sessions and skips model switching when the cache is warm. Each model switch previously invalidated Anthropic's per-model KV cache (~$0.30 rebuild cost for 80k-token system prompts). Routing is now only allowed on the first request of a session or after the 5-minute cache TTL expires

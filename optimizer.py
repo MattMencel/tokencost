@@ -72,6 +72,10 @@ def record_cache_state(model: str, now: float,
     key = _session_key(body_bytes) if body_bytes else None
     if not key:
         return
+    if len(_session_state) > 1000:
+        # evict oldest entry by last_ts
+        oldest = min(_session_state, key=lambda k: _session_state[k].get("last_ts", 0))
+        del _session_state[oldest]
     prev = _session_state.get(key, {})
     _session_state[key] = {
         "model":      model,
@@ -164,6 +168,9 @@ def dedup_check(body_bytes: bytes, now: float) -> tuple:
 
 def dedup_cache_response(req_hash: str, response: bytes, now: float):
     """Store successful response in dedup cache."""
+    if len(_dedup_cache) > 500:
+        oldest = min(_dedup_cache, key=lambda k: _dedup_cache[k][1])
+        del _dedup_cache[oldest]
     _dedup_cache[req_hash] = (response, now)
 
 
