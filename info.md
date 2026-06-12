@@ -305,7 +305,7 @@ The proxy only looks at the **last user message** (not the full context).
 
 | Condition | Score |
 |-----------|-------|
-| Extended thinking (`budget_tokens` > 0) | = **10** (keep) |
+| Extended thinking active | = **10** (keep) |
 | No user text (only tool_result — middle of tool chain) | = **10** (keep) |
 | Simple question: starts with `what is / explain` and < 120 chars | = **0** → Haiku |
 | Message > 500 chars | +2 |
@@ -314,8 +314,16 @@ The proxy only looks at the **last user message** (not the full context).
 | Code block ` ``` ` in prompt | +3 |
 | File extension `.py / .ts / .js / .sql / .go` in prompt | +3 |
 | Construct `def / class / function / import` in prompt | +2 |
-| File path `/src/ / ./` in prompt | +1 |
-| Tool calls in last 4 messages (active tool chain) | +2 |
+| File path `/src/ / ./` in prompt | **+2** (codebase refs need context Haiku lacks) |
+| Tool calls in last 4 messages | **+1 per call, up to +4** (depth-proportional) |
+
+**Keywords that trigger +3:** `implement`, `create`, `build`, `refactor`, `migrate`, `integrate`, `optimize`, `architect`, `design`, `redesign`, `rewrite`, `fix`, `debug`, `analyze`, `review`, `add feature`, `add support`, `extend`, `update`, `modify`, `authentication`, `authorization`, `database schema`, `api design`, `rest api`, `graphql`, `microservice`, `deploy`, `infrastructure`, `security`, `performance`, `concurrency`, `algorithm`, `write`, `generate code`
+
+Note: `"add a"` was removed from keywords — "add a newline here" is not complex.
+
+### Haiku Upgrade Path
+
+If a session started on Haiku (first request was simple, score ≤ 2) and a later request scores **≥ 6**, the proxy allows upgrading to a more capable model — even if the prompt cache is warm. Cache bust (~$0.30) is acceptable when task quality matters more than cache savings.
 
 ### Examples
 
@@ -325,12 +333,14 @@ The proxy only looks at the **last user message** (not the full context).
 | `test` | 2 | **Haiku** | short |
 | `what is a lambda` | 0 | **Haiku** | "what is" pattern |
 | `how does cache work` | 0 | **Haiku** | "how does" pattern |
+| `add a newline here` | 0–1 | **Haiku** | no longer triggers keyword |
 | `how to install Python` | 1 | **Haiku** | short question |
 | `implement JWT authentication` | 3 | **Sonnet** | keyword +3 |
-| `implement OAuth2 integration` | 3 | **Sonnet** | keyword +3 |
-| `fix bug in auth.py` | 4 | **Sonnet** | `fix` +3, file `.py` +1 |
+| `fix bug in auth.py` | 5 | **Sonnet** | `fix` +3, `.py` +3 → capped at 5 |
+| `fix /src/auth/middleware.py` | 5 | **Sonnet** | `fix` +3, file path +2 |
 | `write a function that parses JSON` | 5 | **Sonnet** | `write` +3, `function` +2 |
 | long request with code and task | 7+ | **Sonnet/Opus** | length + code + keywords |
+| Tool-chain (3 tool calls in last 4 msgs) | +3 from tools alone | likely **keep** | depth signal |
 | Tool-chain steps (Bash/Read/Edit without user text) | 10 | **keep** | don't break active chain |
 
 ### What the Proxy Strips from Requests

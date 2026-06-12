@@ -1,3 +1,11 @@
+# v1.1.2 — docs: update info.md with v1.1.1 scoring changes
+
+- Updated scoring table: file path +1→+2, tool calls flat→depth-proportional, "add a" removal documented
+- Added "Haiku Upgrade Path" section explaining score≥6 cache-bust exception
+- Updated examples table with new scores and edge cases
+
+---
+
 # v1.1.1 — Scoring and routing accuracy fixes
 
 - **Fix: "add a" false positive removed** from `_COMPLEX_KW` — "add a newline here" was scoring +3 and routing to Sonnet. Kept "add feature" and "add support" as legitimate complex signals
