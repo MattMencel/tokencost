@@ -268,12 +268,28 @@ tokencost/
 ├── onbording.ps1      — Setup / start / stop script (Windows)
 ├── tokencost.bat      — Windows launcher (double-click)
 ├── requirements.txt   — Python dependencies
+├── requirements-dev.txt — Dev-only deps (pytest, respx)
+├── tests/             — pytest suite (see TESTING.md)
 └── menubar/           — macOS SwiftUI menu bar app
     ├── build.sh
     └── Sources/TokenCostBar/
         ├── MenuBarView.swift
         └── StatsModel.swift
 ```
+
+---
+
+## Testing
+
+Run the suite locally:
+
+```bash
+./run-tests.sh --install   # first time (installs pytest + respx)
+./run-tests.sh             # thereafter
+```
+
+See [TESTING.md](TESTING.md) for layout and conventions. CI runs the same suite
+on every push and pull request.
 
 ---
 

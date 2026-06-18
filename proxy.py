@@ -641,6 +641,37 @@ app = FastAPI(lifespan=lifespan)
 
 # ── Anthropic proxy (/v1/*) ───────────────────────────────────────────────────
 
+def _normalize_for_downgrade(body_data: dict, headers: dict, routed: str) -> None:
+    """Strip request attributes the cheaper routing target can't accept.
+
+    Mutates ``body_data`` and ``headers`` in place. Only called when routing has
+    rewritten the model to ``routed`` (a downgrade). Everything else the client
+    sent is forwarded verbatim — see docs/adr/0001.
+
+    - context-1m beta header: a [1m] session sends `anthropic-beta: context-1m-…`;
+      a smaller-context target rejects it ("400 The long context beta is not yet
+      available for this subscription"). It's an HTTP header, not a body field.
+    - output_config.effort / top-level effort: Haiku 4.5 returns 400 on the effort
+      parameter. Claude Code sends effort with Opus; strip it only when routing to
+      a target that can't take it (Haiku). Sonnet 4.6 accepts effort, so it stays.
+    """
+    for hk in list(headers):
+        if hk.lower() == "anthropic-beta":
+            kept = [b.strip() for b in headers[hk].split(",")
+                    if not b.strip().startswith("context-1m")]
+            if kept:
+                headers[hk] = ",".join(kept)
+            else:
+                del headers[hk]
+    if "haiku" in routed.lower():
+        body_data.pop("effort", None)
+        oc = body_data.get("output_config")
+        if isinstance(oc, dict):
+            oc.pop("effort", None)
+            if not oc:
+                body_data.pop("output_config", None)
+
+
 @app.api_route("/v1/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy_anthropic(path: str, request: Request):
     body_bytes = await request.body()
@@ -672,32 +703,10 @@ async def proxy_anthropic(path: str, request: Request):
                 optimizations = []
             else:
                 body_data["model"] = routed
-                # Routing downgrades the model for simple prompts. Normalize ONLY
-                # what the cheaper target can't accept; forward everything else the
-                # client sent unchanged (see docs/adr/0001).
-                #
-                # context-1m beta header: a [1m] session sends
-                # `anthropic-beta: context-1m-…`; a smaller-context model rejects
-                # it ("400 The long context beta is not yet available for this
-                # subscription"). It's an HTTP header, not a body field.
-                for hk in list(headers):
-                    if hk.lower() == "anthropic-beta":
-                        kept = [b.strip() for b in headers[hk].split(",")
-                                if not b.strip().startswith("context-1m")]
-                        if kept:
-                            headers[hk] = ",".join(kept)
-                        else:
-                            del headers[hk]
-                # effort parameter: Haiku 4.5 rejects output_config.effort (400).
-                # Claude Code sends effort with Opus; strip it only when the
-                # downgrade target can't take it.
-                if "haiku" in routed.lower():
-                    body_data.pop("effort", None)
-                    oc = body_data.get("output_config")
-                    if isinstance(oc, dict):
-                        oc.pop("effort", None)
-                        if not oc:
-                            body_data.pop("output_config", None)
+                # Routing downgrades the model for simple prompts. Normalize only
+                # what the cheaper target can't accept; forward everything else
+                # the client sent unchanged (docs/adr/0001).
+                _normalize_for_downgrade(body_data, headers, routed)
                 print(f"  [routing] {orig_model} → {routed} (score={score})")
                 optimizations = [("routing", f"{orig_model} → {routed} (score={score})")]
         else:
