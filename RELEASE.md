@@ -1,3 +1,9 @@
+# v1.1.5 — Add pytest suite and CI workflow
+
+- **332 tests** across 6 modules: request passthrough, routing normalization, cache injection, cost accounting (TTL multipliers), response parsing, optimizer dedup/routing-skip, importer dedup/cutoff guard, DB aggregations.
+- **GitHub Actions CI** on every push/PR (`python 3.11`, pinned action SHAs, `contents: read` only).
+- **Refactor:** routing normalization extracted to `_normalize_for_downgrade()` for unit testability — logic unchanged.
+
 # v1.1.4 — Cache-write TTL accuracy + clearer cost labelling
 
 Three related changes. All token-accounting math is unchanged for existing rows.
