@@ -31,3 +31,6 @@ menubar/.build/
 .vscode/launch.json
 .claude/settings.json
 .aider.*
+
+# Serena MCP local cache
+.serena/

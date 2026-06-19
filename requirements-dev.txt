@@ -1,0 +1,4 @@
+# Dev-only dependencies (not needed at runtime). Install with:
+#   ./venv/bin/python -m pip install -r requirements-dev.txt
+pytest>=9.0
+respx>=0.21        # httpx mocking for proxy integration tests
