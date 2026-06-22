@@ -14,6 +14,7 @@ Groups:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import os
@@ -375,6 +376,16 @@ def _make_request(user_agent: str | None = None) -> "Request":
     return _Request(scope)
 
 
+def _stream_factory(chunks, content_type="text/event-stream", status=200):
+    """respx side-effect: fresh streaming httpx.Response per call (generators are single-use)."""
+    def _factory(request):
+        async def _aiter():
+            for c in chunks:
+                yield c
+        return httpx.Response(status, headers={"content-type": content_type}, content=_aiter())
+    return _factory
+
+
 class TestDetectSource:
     """proxy.detect_source(request) tested via direct Starlette Request construction.
 
@@ -734,3 +745,52 @@ class TestProxyAnthropic:
             headers={"x-api-key": "bad-key", "anthropic-version": "2023-06-01"},
         )
         assert resp.status_code == 401
+
+
+class TestStreamUpstream:
+    """proxy.stream_upstream — provider-agnostic streaming mechanics."""
+
+    @respx.mock
+    def test_tees_chunks_and_calls_finalize_once(self):
+        chunks = [b"chunk-A", b"chunk-B", b"chunk-C"]
+        respx.post("https://up.example/v1/messages").mock(side_effect=_stream_factory(chunks))
+        calls = []
+
+        def finalize(status, content_type, full_bytes, duration_ms, completed):
+            calls.append((status, content_type, full_bytes, completed))
+
+        async def run():
+            resp = await proxy.stream_upstream(
+                "POST", "https://up.example/v1/messages",
+                {"x-api-key": "k"}, b'{"model":"x"}', 120, finalize, time.time())
+            got = [c async for c in resp.body_iterator]
+            return resp, got
+
+        resp, got = asyncio.run(run())
+        assert resp.status_code == 200
+        assert got == chunks
+        assert len(calls) == 1
+        status, ct, full, completed = calls[0]
+        assert status == 200
+        assert ct == "text/event-stream"
+        assert full == b"chunk-Achunk-Bchunk-C"
+        assert completed is True
+
+    @respx.mock
+    def test_connect_failure_records_502_and_closes(self):
+        respx.post("https://up.example/v1/messages").mock(
+            side_effect=httpx.ConnectError("connection refused"))
+        calls = []
+
+        def finalize(status, content_type, full_bytes, duration_ms, completed):
+            calls.append((status, completed))
+
+        async def run():
+            return await proxy.stream_upstream(
+                "POST", "https://up.example/v1/messages",
+                {"x-api-key": "k"}, b'{"model":"x"}', 120, finalize, time.time())
+
+        resp = asyncio.run(run())
+        assert resp.status_code == 502
+        assert len(calls) == 1
+        assert calls[0] == (502, False)

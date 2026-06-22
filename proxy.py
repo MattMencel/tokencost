@@ -24,7 +24,7 @@ import time
 import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 import uvicorn
 from optimizer import (
     optimize_request,
@@ -637,6 +637,64 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+async def stream_upstream(method, url, headers, body_bytes, timeout, finalize, t0):
+    """Open an upstream streaming request and return a StreamingResponse that tees
+    each chunk to the client while accumulating the full body. After the stream
+    ends — cleanly, on client disconnect, or on upstream error — finalize(status,
+    content_type, full_bytes, duration_ms, completed) is called exactly once for
+    usage accounting + dedup caching.
+
+    Uses client.send(..., stream=True) (NOT `async with client.stream(...)`) so the
+    generator owns the client/response lifecycle and closes both in `finally` — an
+    `async with` would close the client when this function returns, before the
+    generator runs.
+
+    Per-read `timeout` is intentional and must NOT be changed to a total-duration
+    cap: per-read resets on each chunk, so a 600s stream that keeps emitting never
+    trips it, while a hung upstream still does.
+    """
+    client = httpx.AsyncClient(timeout=timeout)
+    req = client.build_request(method, url, headers=headers, content=body_bytes)
+    try:
+        resp = await client.send(req, stream=True)
+    except Exception as e:
+        # Connect-time failure (DNS, refused, connect timeout): nothing streamed yet,
+        # so the generator's finally never runs. Close the client (no leak), record a
+        # best-effort partial, and return a real error instead of a raw 500.
+        await client.aclose()
+        try:
+            finalize(502, "", b"", int((time.time() - t0) * 1000), False)
+        except Exception:
+            pass
+        return Response(
+            content=json.dumps({"error": f"upstream connection failed: {e}"}).encode(),
+            status_code=502, media_type="application/json")
+
+    status = resp.status_code
+    content_type = resp.headers.get("content-type", "")
+    skip_resp = {"content-encoding", "content-length", "transfer-encoding"}
+    passthrough = {k: v for k, v in resp.headers.items() if k.lower() not in skip_resp}
+
+    async def gen():
+        buf = bytearray()
+        completed = False
+        try:
+            async for chunk in resp.aiter_bytes():
+                yield chunk           # client first — zero added latency
+                buf.extend(chunk)     # tee
+            completed = True
+        finally:
+            await resp.aclose()
+            await client.aclose()
+            try:
+                finalize(status, content_type, bytes(buf),
+                         int((time.time() - t0) * 1000), completed)
+            except Exception:
+                pass                  # bookkeeping must never break the response
+    return StreamingResponse(gen(), status_code=status,
+                             media_type=content_type, headers=passthrough)
 
 
 # ── Anthropic proxy (/v1/*) ───────────────────────────────────────────────────
