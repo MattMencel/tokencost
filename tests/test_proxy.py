@@ -954,6 +954,24 @@ class TestStreamUpstream:
         assert len(calls) == 1
         assert calls[0] == (502, False)
 
+    @respx.mock
+    def test_connect_failure_logs_cause(self, capsys):
+        respx.post("https://up.example/v1/messages").mock(
+            side_effect=httpx.ConnectError("connection refused"))
+
+        def finalize(status, content_type, full_bytes, duration_ms, completed):
+            pass
+
+        async def run():
+            return await proxy.stream_upstream(
+                "POST", "https://up.example/v1/messages",
+                {"x-api-key": "k"}, b'{"model":"x"}', 120, finalize, time.time())
+
+        asyncio.run(run())
+        out = capsys.readouterr().out
+        assert "[stream] connect failed" in out
+        assert "connection refused" in out
+
 
 class TestProxyOpenAICompat:
     """Integration tests for the /<provider>/v1/* handler."""

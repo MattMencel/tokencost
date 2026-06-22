@@ -22,9 +22,14 @@ proxy then completed and recorded a 200 for the request the client had abandoned
   error, and connect-time failure record `stop_reason="incomplete"` (connect failures
   also record status 502 and return a real error instead of a raw 500) — no schema
   change. Previously a disconnected stream masqueraded as a clean 200.
-- **Tests:** 344 passing (12 new streaming tests — incremental delivery, SSE
-  accounting, dedup content-type round-trip, disconnect/partial, connect failure,
-  JSON-through-stream, OpenAI-compat streaming).
+- **Diagnostic logging on stream failures.** `proxy.log` now carries a `[stream]`
+  line with the cause whenever a stream ends abnormally — connect failure (`type: msg`),
+  client disconnect (bytes received), upstream mid-stream error, or an accounting
+  error in the finalize callback (previously swallowed silently). Makes a recurrence
+  or a new failure mode diagnosable instead of just visible-as-`incomplete`.
+- **Tests:** 345 passing (13 new streaming tests — incremental delivery, SSE
+  accounting, dedup content-type round-trip, disconnect/partial, connect failure +
+  failure logging, JSON-through-stream, OpenAI-compat streaming).
 
 # v1.1.5 — Add pytest suite and CI workflow
 

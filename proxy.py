@@ -663,6 +663,7 @@ async def stream_upstream(method, url, headers, body_bytes, timeout, finalize, t
         # Connect-time failure (DNS, refused, connect timeout): nothing streamed yet,
         # so the generator's finally never runs. Close the client (no leak), record a
         # best-effort partial, and return a real error instead of a raw 500.
+        print(f"  [stream] connect failed: {type(e).__name__}: {e}")
         await client.aclose()
         try:
             finalize(502, "", b"", int((time.time() - t0) * 1000), False)
@@ -685,14 +686,26 @@ async def stream_upstream(method, url, headers, body_bytes, timeout, finalize, t
                 yield chunk           # client first — zero added latency
                 buf.extend(chunk)     # tee
             completed = True
+        except GeneratorExit:
+            # Client hung up mid-stream — Starlette closes the generator at `yield`.
+            print(f"  [stream] client disconnected after {len(buf)}B (incomplete)")
+            raise                     # must re-raise: a swallowed GeneratorExit is a RuntimeError
+        except Exception as e:
+            # Upstream died mid-stream (aiter_bytes raised). Re-raise so the client sees
+            # a truncated/aborted response rather than a silently-clean one.
+            print(f"  [stream] upstream error mid-stream after {len(buf)}B: "
+                  f"{type(e).__name__}: {e} (incomplete)")
+            raise
         finally:
             await resp.aclose()
             await client.aclose()
             try:
                 finalize(status, content_type, bytes(buf),
                          int((time.time() - t0) * 1000), completed)
-            except Exception:
-                pass                  # bookkeeping must never break the response
+            except Exception as e:
+                # Bookkeeping must never break the response — but don't swallow silently.
+                print(f"  [stream] finalize/accounting error (response unaffected): "
+                      f"{type(e).__name__}: {e}")
     return StreamingResponse(gen(), status_code=status,
                              media_type=content_type, headers=passthrough)
 
