@@ -1,3 +1,13 @@
+## 1.1.6 — Async accounting writes (no more "database is locked" drops)
+
+- Usage rows are now written off the request path via an in-process queue and a
+  single background writer thread, so a DB write can never block an agent request.
+- All `tracker.db` connections use WAL journal mode + a 3s busy_timeout, removing
+  the rollback-journal lock-upgrade deadlock that silently dropped usage rows.
+- The sync importer shares the same connection helper.
+- Dashboard data is now eventually consistent (rows land milliseconds after the
+  request). See ADR-0002.
+
 # v1.1.5 — Add pytest suite and CI workflow
 
 - **332 tests** across 6 modules: request passthrough, routing normalization, cache injection, cost accounting (TTL multipliers), response parsing, optimizer dedup/routing-skip, importer dedup/cutoff guard, DB aggregations.
