@@ -647,3 +647,12 @@ class TestImportClaudeJsonl:
         ).fetchone()
         # claude-sonnet-4-5: $3.0/M input → $3.0 for 1M tokens
         assert row[0] == pytest.approx(3.0)
+
+
+class TestSharedConnect:
+    def test_import_history_uses_shared_connect(self):
+        import import_history as _ih
+        import db as _db
+        # The importer must reuse db._connect (single source of truth for the
+        # WAL/busy_timeout PRAGMAs), not define its own.
+        assert _ih._connect is _db._connect
