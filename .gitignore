@@ -3,6 +3,8 @@
 
 # Databases
 tracker.db
+tracker.db-wal
+tracker.db-shm
 tracker.db.empty
 requests.db
 

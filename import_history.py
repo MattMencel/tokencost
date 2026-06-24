@@ -41,7 +41,7 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 sys.path.insert(0, str(Path(__file__).parent))
-from db import PRICING as DB_PRICING, init_db as _init_db
+from db import PRICING as DB_PRICING, init_db as _init_db, _connect
 
 DB_PATH  = Path(__file__).parent / "tracker.db"
 HOME     = Path.home()
@@ -707,7 +707,7 @@ def _backfill_previews_from_jsonl(conn) -> int:
 
 def import_all(verbose: bool = True) -> dict:
     _init_db()
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect(DB_PATH)
     ensure_schema(conn)
     cutoff = _proxy_cutoff(conn)
 

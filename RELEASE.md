@@ -1,3 +1,16 @@
+# v1.1.7 — Async accounting writes + streaming proxy
+
+## Streaming (PR #10)
+- **Responses now stream.** Proxy no longer buffers the entire upstream response — chunks flow to the client immediately, fixing idle-timeout aborts on long requests.
+- Partial/aborted streams record `stop_reason="incomplete"` instead of silent 200s.
+- Dedup cache now round-trips correct `content-type`.
+- Tests: 345 passing (13 new streaming tests).
+
+## Async accounting writes (PR #11)
+- Usage rows written off the request path via in-process queue + background writer thread — DB write can never block an agent request.
+- All `tracker.db` connections use WAL journal mode + 3s busy_timeout — eliminates "database is locked" silent row drops.
+- Dashboard data eventually consistent (rows land milliseconds after request). See ADR-0002.
+
 # v1.1.6 — Stream upstream responses (fixes long-request timeouts)
 
 The proxy **buffered** the entire upstream response before sending any bytes to the
@@ -23,13 +36,8 @@ proxy then completed and recorded a 200 for the request the client had abandoned
   also record status 502 and return a real error instead of a raw 500) — no schema
   change. Previously a disconnected stream masqueraded as a clean 200.
 - **Diagnostic logging on stream failures.** `proxy.log` now carries a `[stream]`
-  line with the cause whenever a stream ends abnormally — connect failure (`type: msg`),
-  client disconnect (bytes received), upstream mid-stream error, or an accounting
-  error in the finalize callback (previously swallowed silently). Makes a recurrence
-  or a new failure mode diagnosable instead of just visible-as-`incomplete`.
-- **Tests:** 345 passing (13 new streaming tests — incremental delivery, SSE
-  accounting, dedup content-type round-trip, disconnect/partial, connect failure +
-  failure logging, JSON-through-stream, OpenAI-compat streaming).
+  line with the cause whenever a stream ends abnormally.
+- **Tests:** 345 passing (13 new streaming tests).
 
 # v1.1.5 — Add pytest suite and CI workflow
 
