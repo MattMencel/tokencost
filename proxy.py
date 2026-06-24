@@ -24,7 +24,7 @@ import time
 import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 import uvicorn
 from optimizer import (
     optimize_request,
@@ -639,6 +639,77 @@ async def lifespan(_: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+async def stream_upstream(method, url, headers, body_bytes, timeout, finalize, t0):
+    """Open an upstream streaming request and return a StreamingResponse that tees
+    each chunk to the client while accumulating the full body. After the stream
+    ends — cleanly, on client disconnect, or on upstream error — finalize(status,
+    content_type, full_bytes, duration_ms, completed) is called exactly once for
+    usage accounting + dedup caching.
+
+    Uses client.send(..., stream=True) (NOT `async with client.stream(...)`) so the
+    generator owns the client/response lifecycle and closes both in `finally` — an
+    `async with` would close the client when this function returns, before the
+    generator runs.
+
+    Per-read `timeout` is intentional and must NOT be changed to a total-duration
+    cap: per-read resets on each chunk, so a 600s stream that keeps emitting never
+    trips it, while a hung upstream still does.
+    """
+    client = httpx.AsyncClient(timeout=timeout)
+    req = client.build_request(method, url, headers=headers, content=body_bytes)
+    try:
+        resp = await client.send(req, stream=True)
+    except Exception as e:
+        # Connect-time failure (DNS, refused, connect timeout): nothing streamed yet,
+        # so the generator's finally never runs. Close the client (no leak), record a
+        # best-effort partial, and return a real error instead of a raw 500.
+        print(f"  [stream] connect failed: {type(e).__name__}: {e}")
+        await client.aclose()
+        try:
+            finalize(502, "", b"", int((time.time() - t0) * 1000), False)
+        except Exception:
+            pass
+        return Response(
+            content=json.dumps({"error": f"upstream connection failed: {e}"}).encode(),
+            status_code=502, media_type="application/json")
+
+    status = resp.status_code
+    content_type = resp.headers.get("content-type", "")
+    skip_resp = {"content-encoding", "content-length", "transfer-encoding"}
+    passthrough = {k: v for k, v in resp.headers.items() if k.lower() not in skip_resp}
+
+    async def gen():
+        buf = bytearray()
+        completed = False
+        try:
+            async for chunk in resp.aiter_bytes():
+                yield chunk           # client first — zero added latency
+                buf.extend(chunk)     # tee
+            completed = True
+        except GeneratorExit:
+            # Client hung up mid-stream — Starlette closes the generator at `yield`.
+            print(f"  [stream] client disconnected after {len(buf)}B (incomplete)")
+            raise                     # must re-raise: a swallowed GeneratorExit is a RuntimeError
+        except Exception as e:
+            # Upstream died mid-stream (aiter_bytes raised). Re-raise so the client sees
+            # a truncated/aborted response rather than a silently-clean one.
+            print(f"  [stream] upstream error mid-stream after {len(buf)}B: "
+                  f"{type(e).__name__}: {e} (incomplete)")
+            raise
+        finally:
+            await resp.aclose()
+            await client.aclose()
+            try:
+                finalize(status, content_type, bytes(buf),
+                         int((time.time() - t0) * 1000), completed)
+            except Exception as e:
+                # Bookkeeping must never break the response — but don't swallow silently.
+                print(f"  [stream] finalize/accounting error (response unaffected): "
+                      f"{type(e).__name__}: {e}")
+    return StreamingResponse(gen(), status_code=status,
+                             media_type=content_type, headers=passthrough)
+
+
 # ── Anthropic proxy (/v1/*) ───────────────────────────────────────────────────
 
 def _normalize_for_downgrade(body_data: dict, headers: dict, routed: str) -> None:
@@ -680,17 +751,18 @@ async def proxy_anthropic(path: str, request: Request):
 
     # ── Deduplication: check if identical request came <5s ago ──────────────────
     now = time.time()
-    cached_resp, req_hash = dedup_check(body_bytes, now)
+    cached_resp, cached_ct, req_hash = dedup_check(body_bytes, now)
     if cached_resp:
         print(f"  [dedup]   returning cached response (saved API call)")
         return Response(content=cached_resp, status_code=200,
-                      headers={"content-type": "application/json"})
+                      headers={"content-type": cached_ct})
 
     t0      = time.time()
     source  = detect_source(request)
     effort  = detect_effort(body_bytes)
     ua      = request.headers.get("user-agent", "")
     preview = extract_prompt_preview(body_bytes)
+    auto_thinking = False
 
     orig_model, routed, score = route_model(body_bytes)
     try:
@@ -728,42 +800,26 @@ async def proxy_anthropic(path: str, request: Request):
         optimizations = []
         pass
 
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.request(
-            method=request.method,
-            url=f"{ANTHROPIC_URL}/v1/{path}",
-            headers=headers,
-            content=body_bytes,
-        )
+    from optimizer import record_cache_state, calculate_optimization_savings
 
-    duration_ms  = int((time.time() - t0) * 1000)
-    content_type = resp.headers.get("content-type", "")
-    model, inp, out, cr, cw, cw_1h, stop, tools, tool_names, msg_id = _parse_anthropic(
-        resp.content, content_type)
+    def finalize(status, content_type, full_bytes, duration_ms, completed):
+        model, inp, out, cr, cw, cw_1h, stop, tools, tool_names, msg_id = _parse_anthropic(
+            full_bytes, content_type)
+        if not completed and not stop:
+            stop = "incomplete"
+        # Track per-session cache state so next request can decide whether to route
+        record_cache_state(model, now, body_bytes=body_bytes, cache_write_tokens=cw)
+        # Calculate optimizer savings
+        opt_json, opt_savings = calculate_optimization_savings(optimizations, model, inp, out, cr)
+        _record(source, model, inp, out, cr, cw, duration_ms,
+                status, ua, stop, tools, tool_names, effort, preview, msg_id, auto_thinking,
+                opt_json, opt_savings, cw_1h=cw_1h)
+        # Cache successful, fully-received responses for deduplication
+        if completed and status == 200:
+            dedup_cache_response(req_hash, full_bytes, now, content_type=content_type)
 
-    # Track per-session cache state so next request can decide whether to route
-    from optimizer import record_cache_state
-    record_cache_state(model, now, body_bytes=body_bytes, cache_write_tokens=cw)
-
-    # Calculate optimizer savings
-    from optimizer import calculate_optimization_savings
-    opt_json, opt_savings = calculate_optimization_savings(optimizations, model, inp, out, cr)
-
-    _record(source, model, inp, out, cr, cw, duration_ms,
-            resp.status_code, ua, stop, tools, tool_names, effort, preview, msg_id, auto_thinking,
-            opt_json, opt_savings, cw_1h=cw_1h)
-
-    # ── Cache successful response for deduplication ──────────────────────────────
-    if resp.status_code == 200:
-        dedup_cache_response(req_hash, resp.content, now)
-
-    skip_resp = {"content-encoding", "content-length", "transfer-encoding"}
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        headers={k: v for k, v in resp.headers.items() if k.lower() not in skip_resp},
-        media_type=resp.headers.get("content-type"),
-    )
+    return await stream_upstream(
+        request.method, f"{ANTHROPIC_URL}/v1/{path}", headers, body_bytes, 120, finalize, t0)
 
 
 # ── Transparent passthrough for Anthropic /api/oauth/* ────────────────────────
@@ -820,33 +876,20 @@ async def proxy_openai_compat(provider: str, path: str, request: Request):
         source = provider  # label by provider when UA is generic
 
     upstream = PROVIDER_URLS[provider]
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.request(
-            method=request.method,
-            url=f"{upstream}/v1/{path}",
-            headers=headers,
-            content=body_bytes,
-        )
 
-    duration_ms  = int((time.time() - t0) * 1000)
-    content_type = resp.headers.get("content-type", "")
-    model, inp, out, cr, cw, stop, tools, tool_names = _parse_openai(
-        resp.content, content_type, req_model)
+    def finalize(status, content_type, full_bytes, duration_ms, completed):
+        model, inp, out, cr, cw, stop, tools, tool_names = _parse_openai(
+            full_bytes, content_type, req_model)
+        if not completed and not stop:
+            stop = "incomplete"
+        # Tag model with provider prefix if bare name
+        if "/" not in model:
+            model = f"{provider}/{model}"
+        _record(source, model, inp, out, cr, cw, duration_ms,
+                status, ua, stop, tools, tool_names, prompt_preview=preview)
 
-    # Tag model with provider prefix if bare name
-    if "/" not in model:
-        model = f"{provider}/{model}"
-
-    _record(source, model, inp, out, cr, cw, duration_ms,
-            resp.status_code, ua, stop, tools, tool_names, prompt_preview=preview)
-
-    skip_resp = {"content-encoding", "content-length", "transfer-encoding"}
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        headers={k: v for k, v in resp.headers.items() if k.lower() not in skip_resp},
-        media_type=resp.headers.get("content-type"),
-    )
+    return await stream_upstream(
+        request.method, f"{upstream}/v1/{path}", headers, body_bytes, 120, finalize, t0)
 
 
 # ── API endpoints ─────────────────────────────────────────────────────────────
