@@ -294,12 +294,20 @@ def _naive_dt(s: str) -> datetime:
     return dt.replace(tzinfo=None) if dt.tzinfo else dt
 
 
-# ts is stored as UTC ISO-8601 text ("2026-06-04T15:34:24.488Z"), which sorts
-# lexicographically. Local-day windows are therefore expressed as half-open ranges
-# against the raw column so they can use idx_requests_ts. Wrapping ts in
-# date(ts, 'localtime') instead is unindexable: it forces a full scan and re-parses
-# every row's timestamp.
-_UTC_FMT     = "%Y-%m-%dT%H:%M:%S.000Z"
+# ts is stored as UTC ISO-8601 text and sorts lexicographically, so local-day
+# windows are expressed as half-open ranges on the raw column. That keeps them
+# usable by idx_requests_ts; wrapping the column in date(ts, 'localtime') instead
+# is unindexable and forces a full scan that re-parses every row.
+#
+# Two spellings exist in the wild: "...T05:00:00.000Z" from imported history, and
+# "...T05:00:00+00:00" / "...T05:00:00.123456+00:00" from save_request(). The bounds
+# are therefore cut at whole seconds with no fractional part and no zone suffix,
+# which is a prefix of all three. Every suffix that can follow starts with '+'
+# (0x2B), '.' (0x2E) or 'Z' (0x5A), all of which sort after the bare prefix, so a row
+# landing exactly on a boundary second sorts above the lower bound and not below the
+# upper one — matching date(ts, 'localtime') exactly. Do not "fix" this to look like
+# a complete timestamp; tests/test_db_stats.py::TestLocalDayRange pins the behaviour.
+_UTC_FMT     = "%Y-%m-%dT%H:%M:%S"
 _TODAY_START = f"strftime('{_UTC_FMT}', date('now', 'localtime'), 'utc')"
 _TODAY_END   = f"strftime('{_UTC_FMT}', date('now', '+1 day', 'localtime'), 'utc')"
 _7D_START    = f"strftime('{_UTC_FMT}', date('now', '-7 days', 'localtime'), 'utc')"

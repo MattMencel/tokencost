@@ -33,6 +33,14 @@ class TestPeriodClause:
         assert "localtime" in clause
         assert "date(" in clause
 
+    def test_today_clause_does_not_wrap_the_column(self):
+        # date(ts, ...) anywhere in the predicate makes it unindexable, which is
+        # the regression the range-bound scheme exists to prevent. The original
+        # assertions above hold for both spellings, so they cannot catch it.
+        clause = db._period_clause("today").replace(" ", "")
+        assert "date(ts" not in clause
+        assert "ts>=" in clause
+
     def test_7d_clause(self):
         clause = db._period_clause("7d")
         assert "-7 days" in clause
@@ -548,3 +556,155 @@ class TestSaveRequestTimestamp:
         ts = con.execute("SELECT ts FROM requests WHERE msg_uuid='ts-default'").fetchone()[0]
         con.close()
         assert ts and ts.startswith("20")  # an ISO timestamp was stamped
+
+
+# ── Local-day range filters (idx_requests_ts) ─────────────────────────────────
+
+import contextlib as _contextlib
+import os as _os
+import time as _time
+
+
+@_contextlib.contextmanager
+def _timezone(name):
+    """Run a block with a fixed process timezone (SQLite 'localtime' honours TZ)."""
+    old = _os.environ.get("TZ")
+    _os.environ["TZ"] = name
+    _time.tzset()
+    try:
+        yield
+    finally:
+        if old is None:
+            _os.environ.pop("TZ", None)
+        else:
+            _os.environ["TZ"] = old
+        _time.tzset()
+
+
+def _day_range_sql(day_expr):
+    """The half-open bounds db.py uses, for an arbitrary day instead of 'now'."""
+    lo = f"strftime('{_db._UTC_FMT}', date({day_expr}), 'utc')"
+    hi = f"strftime('{_db._UTC_FMT}', date({day_expr}, '+1 day'), 'utc')"
+    return f"ts >= {lo} AND ts < {hi}"
+
+
+class TestTsIndex:
+    """The ts index is what makes the local-day filters cheap.
+
+    Without it every dashboard poll scans the whole table, so its absence is a
+    performance regression that no other assertion in this suite would catch.
+    """
+
+    def test_init_db_creates_ts_index(self, tmp_db):
+        con = _sqlite3.connect(tmp_db)
+        indexes = {r[1] for r in con.execute("PRAGMA index_list(requests)")}
+        con.close()
+        assert "idx_requests_ts" in indexes
+
+    def test_init_db_is_idempotent_for_existing_dbs(self, tmp_db):
+        _db.init_db()  # existing DBs re-run this on every startup
+        con = _sqlite3.connect(tmp_db)
+        indexes = {r[1] for r in con.execute("PRAGMA index_list(requests)")}
+        con.close()
+        assert "idx_requests_ts" in indexes
+
+    def test_today_filter_can_use_the_index(self, tmp_db, seed_requests):
+        seed_requests(ts="2026-01-01T12:00:00+00:00")
+        con = _sqlite3.connect(tmp_db)
+        plan = " ".join(
+            str(r[-1]) for r in
+            con.execute(f"EXPLAIN QUERY PLAN SELECT COUNT(*) FROM requests WHERE {_db._TODAY}")
+        )
+        con.close()
+        # Guards against reintroducing date(ts,'localtime'), which is unindexable.
+        assert "idx_requests_ts" in plan, plan
+        assert "SCAN requests" not in plan, plan
+
+    def test_period_clause_today_can_use_the_index(self, tmp_db, seed_requests):
+        # get_stats() reaches the predicate through _period_clause, not _TODAY
+        # directly, so the query it actually builds needs its own guard.
+        seed_requests(ts="2026-01-01T12:00:00+00:00")
+        clause = _db._period_clause("today")
+        con = _sqlite3.connect(tmp_db)
+        plan = " ".join(
+            str(r[-1]) for r in
+            con.execute(f"EXPLAIN QUERY PLAN "
+                        f"SELECT COUNT(*) FROM requests WHERE 1=1 {clause}")
+        )
+        con.close()
+        assert "idx_requests_ts" in plan, plan
+        assert "SCAN requests" not in plan, plan
+
+
+class TestLocalDayRange:
+    """The range bounds must select exactly what date(ts,'localtime') would.
+
+    The bounds are cut at whole seconds with no fractional part and no zone suffix
+    on purpose — see the _UTC_FMT comment in db.py. Both stored spellings ('...Z'
+    from imports, '...+00:00' from save_request) and rows landing exactly on a
+    boundary second have to land on the correct side.
+    """
+
+    # Chicago: US DST. Kathmandu: +05:45, a non-hour offset. UTC: no offset at all.
+    TIMEZONES = ["UTC", "America/Chicago", "Asia/Kathmandu"]
+
+    def _agrees_with_localtime(self, tmp_db, day):
+        con = _sqlite3.connect(tmp_db)
+        try:
+            truth = {r[0] for r in con.execute(
+                "SELECT ts FROM requests WHERE date(ts,'localtime') = ?", (day,))}
+            ranged = {r[0] for r in con.execute(
+                f"SELECT ts FROM requests WHERE {_day_range_sql('?')}", (day, day))}
+        finally:
+            con.close()
+        return truth, ranged
+
+    @pytest.mark.parametrize("tz", TIMEZONES)
+    def test_boundary_second_lands_on_the_correct_day(self, tmp_db, seed_requests, tz):
+        with _timezone(tz):
+            con = _sqlite3.connect(tmp_db)
+            midnight, next_midnight = con.execute(
+                "SELECT strftime('%Y-%m-%dT%H:%M:%S', date('2026-07-31'), 'utc'),"
+                "       strftime('%Y-%m-%dT%H:%M:%S', date('2026-08-01'), 'utc')"
+            ).fetchone()
+            con.close()
+            # Exactly on each boundary, in every spelling the app can produce.
+            for stamp in (midnight, next_midnight):
+                seed_requests(ts=f"{stamp}+00:00")
+                seed_requests(ts=f"{stamp}.000000+00:00")
+                seed_requests(ts=f"{stamp}.000Z")
+
+            truth, ranged = self._agrees_with_localtime(tmp_db, "2026-07-31")
+            assert ranged == truth, (
+                f"tz={tz} missing={sorted(truth - ranged)} extra={sorted(ranged - truth)}")
+            assert len(truth) == 3, truth  # the three at midnight, none from Aug 1
+
+    @pytest.mark.parametrize("tz", TIMEZONES)
+    def test_matches_localtime_across_a_dst_transition(self, tmp_db, seed_requests, tz):
+        # 2026-03-08 is US spring-forward; 02:00 CST jumps to 03:00 CDT.
+        with _timezone(tz):
+            start = datetime.datetime(2026, 3, 7, tzinfo=datetime.timezone.utc)
+            for hour in range(72):                       # Mar 7-9 UTC, hourly
+                stamp = start + datetime.timedelta(hours=hour)
+                # Alternate the two stored spellings so both are exercised.
+                if hour % 2:
+                    seed_requests(ts=stamp.isoformat())
+                else:
+                    seed_requests(ts=stamp.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+
+            for day in ("2026-03-07", "2026-03-08", "2026-03-09"):
+                truth, ranged = self._agrees_with_localtime(tmp_db, day)
+                assert ranged == truth, (
+                    f"tz={tz} day={day} missing={sorted(truth - ranged)} "
+                    f"extra={sorted(ranged - truth)}")
+
+    def test_get_stats_today_excludes_other_days(self, tmp_db, seed_requests):
+        now = datetime.datetime.now(datetime.timezone.utc)
+        # "now" is always inside today's local day, whatever the zone.
+        seed_requests(ts=now.isoformat(), cost_usd=1.5)
+        seed_requests(ts=(now - datetime.timedelta(days=3)).isoformat(), cost_usd=99.0)
+        seed_requests(ts=(now + datetime.timedelta(days=3)).isoformat(), cost_usd=99.0)
+
+        summary = _db.get_stats("today")["summary"]
+        assert summary["total_requests"] == 1
+        assert summary["total_cost"] == pytest.approx(1.5)
