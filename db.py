@@ -294,8 +294,20 @@ def _naive_dt(s: str) -> datetime:
     return dt.replace(tzinfo=None) if dt.tzinfo else dt
 
 
+# ts is stored as UTC ISO-8601 text ("2026-06-04T15:34:24.488Z"), which sorts
+# lexicographically. Local-day windows are therefore expressed as half-open ranges
+# against the raw column so they can use idx_requests_ts. Wrapping ts in
+# date(ts, 'localtime') instead is unindexable: it forces a full scan and re-parses
+# every row's timestamp.
+_UTC_FMT     = "%Y-%m-%dT%H:%M:%S.000Z"
+_TODAY_START = f"strftime('{_UTC_FMT}', date('now', 'localtime'), 'utc')"
+_TODAY_END   = f"strftime('{_UTC_FMT}', date('now', '+1 day', 'localtime'), 'utc')"
+_7D_START    = f"strftime('{_UTC_FMT}', date('now', '-7 days', 'localtime'), 'utc')"
+_TODAY       = f"ts >= {_TODAY_START} AND ts < {_TODAY_END}"
+
+
 def _period_clause(period):
-    if period == "today": return "AND date(ts, 'localtime') = date('now', 'localtime')"
+    if period == "today": return f"AND {_TODAY}"
     if period == "7d":    return "AND ts >= datetime('now', '-7 days')"
     if period == "30d":   return "AND ts >= datetime('now', '-30 days')"
     return ""
@@ -358,6 +370,9 @@ def init_db():
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_msg_uuid "
         "ON requests(msg_uuid) WHERE msg_uuid IS NOT NULL"
     )
+    # Every dashboard poll filters on a ts window; without this the stats
+    # queries scan the whole table. Created here so existing DBs pick it up.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests(ts)")
     con.commit()
     con.close()
 
@@ -684,14 +699,14 @@ def _tool_breakdown(period):
 
 def _hourly_heatmap():
     con = _connect()
-    rows = con.execute("""
+    rows = con.execute(f"""
         SELECT
             date(ts, 'localtime') as day,
             CAST(strftime('%H', ts, 'localtime') AS INTEGER) as hour,
             ROUND(SUM(cost_usd), 6) as total_cost,
             COUNT(*) as reqs
         FROM requests
-        WHERE date(ts, 'localtime') >= date('now', '-7 days', 'localtime')
+        WHERE ts >= {_7D_START}
         GROUP BY day, hour
         ORDER BY day, hour
     """).fetchall()
@@ -702,10 +717,10 @@ def _hourly_heatmap():
 def _daily_trend(period):
     con = _connect()
     if period == "today":
-        rows = con.execute("""
+        rows = con.execute(f"""
             SELECT strftime('%H', ts, 'localtime') as lbl,
                    ROUND(SUM(cost_usd), 5) as cost, COUNT(*) as reqs
-            FROM requests WHERE date(ts, 'localtime') = date('now', 'localtime')
+            FROM requests WHERE {_TODAY}
             GROUP BY lbl ORDER BY lbl
         """).fetchall()
     elif period in ("7d", "30d"):
@@ -731,8 +746,7 @@ def _projection(period="7d"):
     con = _connect()
     if period == "today":
         row = con.execute(
-            "SELECT ROUND(SUM(cost_usd),4) FROM requests "
-            "WHERE date(ts,'localtime')=date('now','localtime')"
+            f"SELECT ROUND(SUM(cost_usd),4) FROM requests WHERE {_TODAY}"
         ).fetchone()
         daily = row[0] or 0
     elif period == "30d":
@@ -1294,8 +1308,7 @@ def _action_plan(summary, haiku_savings, by_model, period, pause=None):
 
     con = _connect()
     today_cost = (con.execute(
-        "SELECT ROUND(SUM(cost_usd),4) FROM requests "
-        "WHERE date(ts,'localtime')=date('now','localtime')"
+        f"SELECT ROUND(SUM(cost_usd),4) FROM requests WHERE {_TODAY}"
     ).fetchone()[0] or 0)
     con.close()
 
