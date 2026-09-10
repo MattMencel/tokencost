@@ -234,7 +234,7 @@ def detect_effort(body_bytes: bytes) -> str:
 # Checked dynamically on every request — no proxy restart needed to toggle.
 _SMART_FILE   = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".smart_routing")
 ROUTE_CHEAP   = os.getenv("ROUTE_CHEAP", "claude-haiku-4-5-20251001")
-ROUTE_MID     = os.getenv("ROUTE_MID",   "claude-sonnet-4-6")
+ROUTE_MID     = os.getenv("ROUTE_MID",   "claude-sonnet-5")
 
 def _smart_routing_enabled() -> bool:
     try:

@@ -22,13 +22,16 @@ def _connect(path=None):
 
 PRICING = {  # all prices in $/million tokens
     # ── Anthropic Claude 4 ─────────────────────────────────────────────────────
+    "claude-fable-5-1":           {"input": 10.0,   "output": 50.0},
     "claude-fable-5":             {"input": 10.0,   "output": 50.0},
+    "claude-opus-5":              {"input": 5.0,    "output": 25.0},
     "claude-opus-4-8":            {"input": 5.0,    "output": 25.0},
     "claude-opus-4-7":            {"input": 5.0,    "output": 25.0},
     "claude-opus-4-6":            {"input": 5.0,    "output": 25.0},
     "claude-opus-4-5":            {"input": 5.0,    "output": 25.0},
     "claude-opus-4-1":            {"input": 15.0,   "output": 75.0},
     "claude-opus-4-20250514":     {"input": 15.0,   "output": 75.0},
+    "claude-sonnet-5":            {"input": 2.0,    "output": 10.0},
     "claude-sonnet-4-6":          {"input": 3.0,    "output": 15.0},
     "claude-sonnet-4-5":          {"input": 3.0,    "output": 15.0},
     "claude-sonnet-4-20250514":   {"input": 3.0,    "output": 15.0},
@@ -929,7 +932,7 @@ def _pause_analysis(period):
     long_ = sum(1 for g in within_gaps if g >= TTL_1H)           # expires regardless
 
     avg_cw = sum(cw_all) / max(len(cw_all), 1)
-    ip     = (PRICING.get("claude-sonnet-4-6") or PRICING["default"])["input"]
+    ip     = (PRICING.get("claude-sonnet-5") or PRICING["default"])["input"]
 
     # Each "mid" gap avoided by 1h TTL: saves (1.25→0.10) per re-write token
     # Extra cost of 1h vs 5m write: (2.00-1.25) per original write token
@@ -1208,7 +1211,7 @@ def _recommendations(summary, haiku_savings, by_model=None, period="7d"):
     # ── Cache hit rate
     if reqs >= 5 and inp > 0:
         hit_rate = cr / inp * 100
-        cw_cost = (summary.get("total_cache_creation") or 0) * (PRICING.get("claude-sonnet-4-6") or PRICING["default"])["input"] * 1.25 / 1e6
+        cw_cost = (summary.get("total_cache_creation") or 0) * (PRICING.get("claude-sonnet-5") or PRICING["default"])["input"] * 1.25 / 1e6
         if hit_rate < 20:
             potential = monthly(cw_cost * 0.5) or 0  # rough: 50% of cache write cost recovered if sessions longer
             recs.append({
@@ -1237,14 +1240,14 @@ def _recommendations(summary, haiku_savings, by_model=None, period="7d"):
             m_cost = m.get("cost") or 0
             if m_reqs >= 3 and m_out / m_reqs < 200:
                 p_opus   = PRICING.get(model_name) or PRICING["default"]
-                p_sonnet = PRICING.get("claude-sonnet-4-6") or PRICING["default"]
+                p_sonnet = PRICING.get("claude-sonnet-5") or PRICING["default"]
                 sonnet_cost = ((m_inp or 0) * p_sonnet["input"] + (m_out or 0) * p_sonnet["output"]) / 1e6
                 period_savings = round(max(0, m_cost - sonnet_cost), 3)
                 recs.append({
                     "level": "warn",
                     "title": f"Opus used for tiny tasks — avg {m_out//m_reqs} output tokens",
                     "problem": f"{m_reqs} Opus requests produced < 200 tokens each. You're paying Opus price (${p_opus['output']}/M) for outputs that Sonnet (${p_sonnet['output']}/M) handles equally well.",
-                    "action": "Add to CLAUDE.md: 'use claude-sonnet-4-6 by default'. Or set env: export ANTHROPIC_MODEL=claude-sonnet-4-6. Reserve Opus only for complex reasoning tasks.",
+                    "action": "Add to CLAUDE.md: 'use claude-sonnet-5 by default'. Or set env: export ANTHROPIC_MODEL=claude-sonnet-5. Reserve Opus only for complex reasoning tasks.",
                     "savings_usd": monthly(period_savings) if period_savings > 0.10 else None,
                 })
                 break
@@ -1252,7 +1255,7 @@ def _recommendations(summary, haiku_savings, by_model=None, period="7d"):
     # ── Large context bloat
     avg_inp = (summary.get("total_input") or 0) / max(reqs, 1)
     if avg_inp > 40_000 and reqs >= 5:
-        p_default = PRICING.get("claude-sonnet-4-6") or PRICING["default"]
+        p_default = PRICING.get("claude-sonnet-5") or PRICING["default"]
         input_cost = (summary.get("total_input") or 0) * p_default["input"] / 1e6
         period_savings = round(input_cost * 0.55, 3)
         recs.append({
@@ -1312,7 +1315,7 @@ def _action_plan(summary, haiku_savings, by_model, period, pause=None):
         m_out  = m.get("out")  or 0
         m_cost = m.get("cost") or 0
         m_cr   = m.get("cache_read") or 0
-        p_son  = PRICING.get("claude-sonnet-4-6") or PRICING["default"]
+        p_son  = PRICING.get("claude-sonnet-5") or PRICING["default"]
         sonnet_cost = (m_inp * p_son["input"] + m_out * p_son["output"] +
                        m_cr  * p_son["input"] * 0.10) / 1e6
         opus_saving_period += max(0.0, m_cost - sonnet_cost)
@@ -1325,7 +1328,7 @@ def _action_plan(summary, haiku_savings, by_model, period, pause=None):
             "title": "Switch Opus → Sonnet",
             "description": (f"{opus_reqs} Opus requests this period. "
                             "Sonnet handles 90% of tasks at 1/5 the price."),
-            "command": '// ~/.claude/settings.json\n{"model": "claude-sonnet-4-6"}\n// or: export ANTHROPIC_MODEL=claude-sonnet-4-6',
+            "command": '// ~/.claude/settings.json\n{"model": "claude-sonnet-5"}\n// or: export ANTHROPIC_MODEL=claude-sonnet-5',
             "daily_saving":   daily,
             "monthly_saving": round(daily * 30, 2),
             "certainty":      "exact",
@@ -1334,7 +1337,7 @@ def _action_plan(summary, haiku_savings, by_model, period, pause=None):
     # ── 2. /compact — estimate from avg context size
     avg_inp = (summary.get("total_input") or 0) / max(summary.get("total_requests") or 1, 1)
     if avg_inp > 15_000:
-        p_son           = PRICING.get("claude-sonnet-4-6") or PRICING["default"]
+        p_son           = PRICING.get("claude-sonnet-5") or PRICING["default"]
         input_cost      = (summary.get("total_input") or 0) * p_son["input"] / 1e6
         compact_saving  = input_cost * 0.40  # rough: /compact cuts ~40% of accumulated context
         daily = round(compact_saving / period_days, 4)
@@ -1371,7 +1374,7 @@ def _action_plan(summary, haiku_savings, by_model, period, pause=None):
     cw = summary.get("total_cache_creation") or 0
     cr = summary.get("total_cache_read")     or 0
     if cw > 1_000:
-        p_son     = PRICING.get("claude-sonnet-4-6") or PRICING["default"]
+        p_son     = PRICING.get("claude-sonnet-5") or PRICING["default"]
         inp_price = p_son["input"]
         total_toks = (summary.get("total_input") or 0) + cr + cw
         hit_rate   = round(cr / total_toks * 100, 1) if total_toks else 0
